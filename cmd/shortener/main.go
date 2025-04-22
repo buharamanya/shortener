@@ -10,12 +10,12 @@ import (
 
 var urlStorage = make(map[string]string)
 
-const baseUrl string = "http://localhost:8080/"
+const baseURL string = "http://localhost:8080/"
 
 func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", shortenURL)
-	mux.HandleFunc("/{shortCode}", redirectByShortUrl)
+	mux.HandleFunc("/{shortCode}", redirectByShortURL)
 	err := http.ListenAndServe(`:8080`, mux)
 	if err != nil {
 		panic(err)
@@ -52,7 +52,7 @@ func shortenURL(w http.ResponseWriter, r *http.Request) {
 	shortCode = strings.TrimRight(shortCode, "=")
 
 	// сохраняем в хранилище
-	shortURL := baseUrl + shortCode
+	shortURL := baseURL + shortCode
 	urlStorage[shortCode] = urlStr
 
 	// возвращаем ответ
@@ -61,7 +61,7 @@ func shortenURL(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(shortURL))
 }
 
-func redirectByShortUrl(w http.ResponseWriter, r *http.Request) {
+func redirectByShortURL(w http.ResponseWriter, r *http.Request) {
 	// проверяем метод запроса
 	if r.Method != http.MethodGet {
 		w.WriteHeader(http.StatusMethodNotAllowed)
