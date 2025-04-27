@@ -52,7 +52,7 @@ func (sh *ShortenHandler) ShortenURL(w http.ResponseWriter, r *http.Request) {
 	shortCode = strings.TrimRight(shortCode, "=")
 
 	// сохраняем в хранилище
-	shortURL := sh.baseURL + shortCode
+	shortURL := sh.baseURL + "/" + shortCode
 	sh.storage.Save(shortCode, urlStr)
 
 	// возвращаем ответ
