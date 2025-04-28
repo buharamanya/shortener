@@ -2,6 +2,7 @@ package config
 
 import (
 	"flag"
+	"os"
 )
 
 type AppConfig struct {
@@ -11,10 +12,21 @@ type AppConfig struct {
 
 var Config AppConfig
 
+var defaultServerBaseURL = "localhost:8080"
+var defaultRedirectBaseURL = "http://localhost:8080"
+
 func InitConfiguration() {
 
-	flag.StringVar(&Config.ServerBaseURL, "a", "localhost:8080", "shortener server URL")
-	flag.StringVar(&Config.RedirectBaseURL, "b", "http://localhost:8080", "shortener redirect URL")
+	Config.ServerBaseURL = os.Getenv("SERVER_ADDRESS")
+	Config.RedirectBaseURL = os.Getenv("BASE_URL")
+
+	if Config.ServerBaseURL == "" {
+		flag.StringVar(&Config.ServerBaseURL, "a", defaultServerBaseURL, "shortener server URL")
+	}
+
+	if Config.RedirectBaseURL == "" {
+		flag.StringVar(&Config.RedirectBaseURL, "b", defaultRedirectBaseURL, "shortener redirect URL")
+	}
 
 	flag.Parse()
 
