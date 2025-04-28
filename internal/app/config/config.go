@@ -17,17 +17,20 @@ var defaultRedirectBaseURL = "http://localhost:8080"
 
 func InitConfiguration() {
 
-	Config.ServerBaseURL = os.Getenv("SERVER_ADDRESS")
-	Config.RedirectBaseURL = os.Getenv("BASE_URL")
-
-	if Config.ServerBaseURL == "" {
-		flag.StringVar(&Config.ServerBaseURL, "a", defaultServerBaseURL, "shortener server URL")
-	}
-
-	if Config.RedirectBaseURL == "" {
-		flag.StringVar(&Config.RedirectBaseURL, "b", defaultRedirectBaseURL, "shortener redirect URL")
-	}
+	flag.StringVar(&Config.ServerBaseURL, "a", defaultServerBaseURL, "shortener server URL")
+	flag.StringVar(&Config.RedirectBaseURL, "b", defaultRedirectBaseURL, "shortener redirect URL")
 
 	flag.Parse()
+
+	envServerBaseURL := os.Getenv("SERVER_ADDRESS")
+	envRedirectBaseURL := os.Getenv("BASE_URL")
+
+	if envServerBaseURL != "" {
+		Config.ServerBaseURL = envServerBaseURL
+	}
+
+	if envRedirectBaseURL != "" {
+		Config.RedirectBaseURL = envRedirectBaseURL
+	}
 
 }
