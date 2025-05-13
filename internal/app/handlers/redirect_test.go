@@ -19,7 +19,7 @@ func TestRedirectByShortURL(t *testing.T) {
 		expectedHeader string
 	}{
 		{
-			name:   "Success: Valid short URL",
+			name:   "Success:Valid_short_URL",
 			method: http.MethodGet,
 			path:   "/abc123",
 			mockSetup: func(m *storage.MockURLStorage) {
@@ -29,7 +29,7 @@ func TestRedirectByShortURL(t *testing.T) {
 			expectedHeader: "https://example.com",
 		},
 		{
-			name:           "Fail: Empty short URL",
+			name:           "Fail:_Empty_short_URL",
 			method:         http.MethodGet,
 			path:           "/",
 			mockSetup:      func(m *storage.MockURLStorage) {}, // Мок не должен вызываться
@@ -37,7 +37,7 @@ func TestRedirectByShortURL(t *testing.T) {
 			expectedHeader: "",
 		},
 		{
-			name:   "Fail: Short URL not found",
+			name:   "Fail:_Short_URL_not_found",
 			method: http.MethodGet,
 			path:   "/invalid",
 			mockSetup: func(m *storage.MockURLStorage) {
@@ -47,7 +47,7 @@ func TestRedirectByShortURL(t *testing.T) {
 			expectedHeader: "",
 		},
 		{
-			name:           "Fail: Wrong HTTP method (POST)",
+			name:           "Fail:_Wrong_HTTP_method_(POST)",
 			method:         http.MethodPost,
 			path:           "/abc123",
 			mockSetup:      func(m *storage.MockURLStorage) {}, // Мок не должен вызываться
@@ -55,7 +55,7 @@ func TestRedirectByShortURL(t *testing.T) {
 			expectedHeader: "",
 		},
 		{
-			name:           "Fail: Wrong HTTP method (PUT)",
+			name:           "Fail:_Wrong_HTTP_method_(PUT)",
 			method:         http.MethodPut,
 			path:           "/abc123",
 			mockSetup:      func(m *storage.MockURLStorage) {},
@@ -78,9 +78,9 @@ func TestRedirectByShortURL(t *testing.T) {
 			handler.RedirectByShortURL(rr, req)
 
 			// Проверяем статус и заголовок
-			assert.Equal(t, tt.expectedStatus, rr.Code)
+			assert.Equal(t, tt.expectedStatus, rr.Code, "Ошибка: некорректный статуса ответа")
 			if tt.expectedHeader != "" {
-				assert.Equal(t, tt.expectedHeader, rr.Header().Get("Location"))
+				assert.Equal(t, tt.expectedHeader, rr.Header().Get("Location"), "Ошибка: хедер Location отсутвует")
 			}
 
 			// Проверяем, что все ожидания по моку выполнены

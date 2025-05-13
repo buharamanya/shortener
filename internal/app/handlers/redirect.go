@@ -3,15 +3,17 @@ package handlers
 import (
 	"net/http"
 	"strings"
-
-	"github.com/buharamanya/shortener/internal/app/storage"
 )
 
-type RedirectHandler struct {
-	storage storage.URLStorage
+type URLGetter interface {
+	Get(shortCode string) (string, error)
 }
 
-func NewRedirectHandler(storage storage.URLStorage) *RedirectHandler {
+type RedirectHandler struct {
+	storage URLGetter
+}
+
+func NewRedirectHandler(storage URLGetter) *RedirectHandler {
 	return &RedirectHandler{
 		storage: storage,
 	}

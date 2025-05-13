@@ -6,16 +6,18 @@ import (
 	"io"
 	"net/http"
 	"strings"
-
-	"github.com/buharamanya/shortener/internal/app/storage"
 )
 
+type URLSaver interface {
+	Save(shortCode string, originalURL string) error
+}
+
 type ShortenHandler struct {
-	storage storage.URLStorage
+	storage URLSaver
 	baseURL string
 }
 
-func NewShortenHandler(storage storage.URLStorage, baseURL string) *ShortenHandler {
+func NewShortenHandler(storage URLSaver, baseURL string) *ShortenHandler {
 	return &ShortenHandler{
 		storage: storage,
 		baseURL: baseURL,

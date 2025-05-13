@@ -4,11 +4,6 @@ import "errors"
 
 var ErrNotFound = errors.New("URL not found")
 
-type URLStorage interface {
-	Save(shortCode string, originalURL string) error
-	Get(shortCode string) (string, error)
-}
-
 // InMemoryStorage - реализация хранилища в памяти
 type InMemoryStorage struct {
 	urls map[string]string
