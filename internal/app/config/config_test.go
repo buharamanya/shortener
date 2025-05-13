@@ -30,7 +30,7 @@ func TestInitConfiguration_DefaultValues(t *testing.T) {
 	}
 
 	if !reflect.DeepEqual(config, expected) {
-		t.Errorf("Ожидалось %v, получено %v", expected, config)
+		t.Errorf("Ошибка установки значений по умолчанию. Ожидалось %v, получено %v", expected, config)
 	}
 }
 
@@ -50,7 +50,7 @@ func TestInitConfiguration_CommandLineFlags(t *testing.T) {
 	}
 
 	if !reflect.DeepEqual(config, expected) {
-		t.Errorf("Ожидалось %v, получено %v", expected, config)
+		t.Errorf("Ошибка установки переменных командной строки. Ожидалось %v, получено %v", expected, config)
 	}
 }
 
@@ -74,7 +74,7 @@ func TestInitConfiguration_EnvironmentVariables(t *testing.T) {
 	}
 
 	if !reflect.DeepEqual(config, expected) {
-		t.Errorf("Ожидалось %v, получено %v", expected, config)
+		t.Errorf("Ошибка установки переменных среды. Ожидалось %v, получено %v", expected, config)
 	}
 }
 
@@ -99,6 +99,6 @@ func TestInitConfiguration_Priority(t *testing.T) {
 	}
 
 	if !reflect.DeepEqual(config, expected) {
-		t.Errorf("Ожидалось %v, получено %v", expected, config)
+		t.Errorf("Ошибка приоритета выбора переменных. Ожидалось %v, получено %v", expected, config)
 	}
 }
