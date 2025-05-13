@@ -5,20 +5,22 @@ import (
 	"os"
 )
 
+const (
+	defaultServerBaseURL   = "localhost:8080"
+	defaultRedirectBaseURL = "http://localhost:8080"
+)
+
 type AppConfig struct {
 	ServerBaseURL   string
 	RedirectBaseURL string
 }
 
-var Config AppConfig
+func InitConfiguration() *AppConfig {
 
-var defaultServerBaseURL = "localhost:8080"
-var defaultRedirectBaseURL = "http://localhost:8080"
+	var config AppConfig
 
-func InitConfiguration() {
-
-	flag.StringVar(&Config.ServerBaseURL, "a", defaultServerBaseURL, "shortener server URL")
-	flag.StringVar(&Config.RedirectBaseURL, "b", defaultRedirectBaseURL, "shortener redirect URL")
+	flag.StringVar(&config.ServerBaseURL, "a", defaultServerBaseURL, "shortener server URL")
+	flag.StringVar(&config.RedirectBaseURL, "b", defaultRedirectBaseURL, "shortener redirect URL")
 
 	flag.Parse()
 
@@ -26,11 +28,13 @@ func InitConfiguration() {
 	envRedirectBaseURL := os.Getenv("BASE_URL")
 
 	if envServerBaseURL != "" {
-		Config.ServerBaseURL = envServerBaseURL
+		config.ServerBaseURL = envServerBaseURL
 	}
 
 	if envRedirectBaseURL != "" {
-		Config.RedirectBaseURL = envRedirectBaseURL
+		config.RedirectBaseURL = envRedirectBaseURL
 	}
+
+	return &config
 
 }

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"log"
 	"net/http"
 
 	"github.com/buharamanya/shortener/internal/app/config"
@@ -9,20 +10,18 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-// const baseURL string = "http://localhost:8080/"
-
 func main() {
-	config.InitConfiguration()
+	var appConfig = config.InitConfiguration()
 
 	repo := storage.NewInMemoryStorage()
 
 	r := chi.NewRouter()
-	r.Post("/", handlers.NewShortenHandler(repo, config.Config.RedirectBaseURL).ShortenURL)
+	r.Post("/", handlers.NewShortenHandler(repo, appConfig.RedirectBaseURL).ShortenURL)
 	r.Get("/{shortCode}", handlers.NewRedirectHandler(repo).RedirectByShortURL)
 
-	err := http.ListenAndServe(config.Config.ServerBaseURL, r)
+	err := http.ListenAndServe(appConfig.ServerBaseURL, r)
 
 	if err != nil {
-		panic(err)
+		log.Fatal("Ошибка запуска сервера:", err)
 	}
 }

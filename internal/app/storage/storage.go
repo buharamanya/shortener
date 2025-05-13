@@ -2,6 +2,8 @@ package storage
 
 import "errors"
 
+var ErrNotFound = errors.New("URL not found")
+
 type URLStorage interface {
 	Save(shortCode string, originalURL string) error
 	Get(shortCode string) (string, error)
@@ -30,5 +32,3 @@ func (s *InMemoryStorage) Get(shortCode string) (string, error) {
 	}
 	return url, nil
 }
-
-var ErrNotFound = errors.New("URL not found")
