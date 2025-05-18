@@ -3,7 +3,6 @@ package main
 import (
 	"log"
 	"net/http"
-	"yandex-go/shortener/internal/app/logger"
 
 	"github.com/buharamanya/shortener/internal/app/config"
 	"github.com/buharamanya/shortener/internal/app/handlers"
@@ -20,14 +19,9 @@ func main() {
 	repo := storage.NewInMemoryStorage()
 
 	r := chi.NewRouter()
-	r.Post(
-		"/",
-		logger.WithLogging(handlers.NewShortenHandler(repo, appConfig.RedirectBaseURL).ShortenURL),
-	)
-	r.Get(
-		"/{shortCode}",
-		logger.WithLogging(handlers.NewRedirectHandler(repo).RedirectByShortURL),
-	)
+	r.Use(logger.WithRequestLogging)
+	r.Post("/", handlers.NewShortenHandler(repo, appConfig.RedirectBaseURL).ShortenURL)
+	r.Get("/{shortCode}", handlers.NewRedirectHandler(repo).RedirectByShortURL)
 
 	err := http.ListenAndServe(appConfig.ServerBaseURL, r)
 

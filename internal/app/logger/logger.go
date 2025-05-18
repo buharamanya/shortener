@@ -66,7 +66,7 @@ func (r *loggingResponseWriter) WriteHeader(statusCode int) {
 	r.responseData.status = statusCode // захватываем код статуса
 }
 
-func WithLogging(h http.Handler) http.Handler {
+func WithRequestLogging(h http.Handler) http.Handler {
 	logFn := func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 
@@ -82,12 +82,20 @@ func WithLogging(h http.Handler) http.Handler {
 
 		duration := time.Since(start)
 
-		Log.Infoln(
-			"uri", r.RequestURI,
-			"method", r.Method,
-			"status", responseData.status, // получаем перехваченный код статуса ответа
-			"duration", duration,
-			"size", responseData.size, // получаем перехваченный размер ответа
+		// Log.Info(
+		// 	"uri", r.RequestURI,
+		// 	"method", r.Method,
+		// 	"status", responseData.status, // получаем перехваченный код статуса ответа
+		// 	"duration", duration,
+		// 	"size", responseData.size, // получаем перехваченный размер ответа
+		// )
+
+		Log.Info("got incoming HTTP request",
+			zap.String("uri", r.RequestURI),
+			zap.String("method", r.Method),
+			zap.String("duration", duration.String()),
+			zap.Int("status", responseData.status),
+			zap.Int("size", responseData.size),
 		)
 	}
 	return http.HandlerFunc(logFn)
