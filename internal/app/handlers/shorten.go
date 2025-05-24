@@ -69,11 +69,11 @@ func (sh *ShortenHandler) ShortenURL(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(shortURL))
 }
 
-type ShortenlUrlRequest struct {
+type ShortenlURLRequest struct {
 	URL string `json:"url"`
 }
 
-type ShortenlUrlResponce struct {
+type ShortenlURLResponce struct {
 	Result string `json:"result"`
 }
 
@@ -95,7 +95,7 @@ func (sh *ShortenHandler) JSONShortenURL(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	var reqDto ShortenlUrlRequest
+	var reqDto ShortenlURLRequest
 	var buf bytes.Buffer
 	// читаем тело запроса
 	_, err := buf.ReadFrom(r.Body)
@@ -133,7 +133,7 @@ func (sh *ShortenHandler) JSONShortenURL(w http.ResponseWriter, r *http.Request)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 
-	var respDto = ShortenlUrlResponce{
+	var respDto = ShortenlURLResponce{
 		Result: shortURL,
 	}
 	resp, _ := json.Marshal(respDto)
