@@ -177,6 +177,8 @@ func TestJSONShortenURL(t *testing.T) {
 			sh.JSONShortenURL(w, req)
 
 			resp := w.Result()
+			defer resp.Body.Close()
+
 			if resp.StatusCode != tt.expectedStatus {
 				t.Errorf("Expected status %d, got %d", tt.expectedStatus, resp.StatusCode)
 			}
