@@ -61,7 +61,10 @@ func (sh *ShortenHandler) ShortenURL(w http.ResponseWriter, r *http.Request) {
 
 	// сохраняем в хранилище
 	shortURL := sh.baseURL + "/" + shortCode
-	sh.storage.Save(shortCode, urlStr)
+	err = sh.storage.Save(shortCode, urlStr)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 
 	// возвращаем ответ
 	w.Header().Set("Content-Type", "text/plain")
@@ -125,9 +128,13 @@ func (sh *ShortenHandler) JSONShortenURL(w http.ResponseWriter, r *http.Request)
 	// генерируем короткий код
 	shortCode := getHash(urlStr)
 
-	// сохраняем в хранилище
+	// создаем и сохраняем в хранилище короткую ссылку
 	shortURL := sh.baseURL + "/" + shortCode
-	sh.storage.Save(shortCode, urlStr)
+	err = sh.storage.Save(shortCode, urlStr)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 
 	// возвращаем ответ
 	w.Header().Set("Content-Type", "application/json")
