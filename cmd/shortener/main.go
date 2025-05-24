@@ -18,10 +18,13 @@ func main() {
 
 	repo := storage.NewInMemoryStorage()
 
+	shortenHandler := handlers.NewShortenHandler(repo, appConfig.RedirectBaseURL)
+
 	r := chi.NewRouter()
 	r.Use(logger.WithRequestLogging)
-	r.Post("/", handlers.NewShortenHandler(repo, appConfig.RedirectBaseURL).ShortenURL)
+	r.Post("/", shortenHandler.ShortenURL)
 	r.Get("/{shortCode}", handlers.NewRedirectHandler(repo).RedirectByShortURL)
+	r.Post("/api/shorten", shortenHandler.JsonShortenURL)
 
 	err := http.ListenAndServe(appConfig.ServerBaseURL, r)
 
