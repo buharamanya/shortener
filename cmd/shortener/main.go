@@ -24,7 +24,7 @@ func main() {
 	r.Use(logger.WithRequestLogging)
 	r.Post("/", shortenHandler.ShortenURL)
 	r.Get("/{shortCode}", handlers.NewRedirectHandler(repo).RedirectByShortURL)
-	r.Post("/api/shorten", shortenHandler.JsonShortenURL)
+	r.Post("/api/shorten", shortenHandler.JSONShortenURL)
 
 	err := http.ListenAndServe(appConfig.ServerBaseURL, r)
 

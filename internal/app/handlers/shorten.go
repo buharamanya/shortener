@@ -82,7 +82,7 @@ func isJSONContentType(r *http.Request) bool {
 	return strings.HasPrefix(contentType, "application/json")
 }
 
-func (sh *ShortenHandler) JsonShortenURL(w http.ResponseWriter, r *http.Request) {
+func (sh *ShortenHandler) JSONShortenURL(w http.ResponseWriter, r *http.Request) {
 	// проверяем метод запроса
 	if r.Method != http.MethodPost {
 		w.WriteHeader(http.StatusMethodNotAllowed)
