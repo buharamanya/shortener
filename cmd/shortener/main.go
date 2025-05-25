@@ -21,7 +21,7 @@ func main() {
 	shortenHandler := handlers.NewShortenHandler(repo, appConfig.RedirectBaseURL)
 
 	r := chi.NewRouter()
-	r.Use(logger.WithRequestLogging)
+	r.Use(handlers.WithGzipMiddleware, logger.WithRequestLogging)
 	r.Post("/", shortenHandler.ShortenURL)
 	r.Get("/{shortCode}", handlers.NewRedirectHandler(repo).RedirectByShortURL)
 	r.Post("/api/shorten", shortenHandler.JSONShortenURL)
