@@ -80,7 +80,7 @@ func TestRedirectByShortURL(t *testing.T) {
 			// Проверяем статус и заголовок
 			assert.Equal(t, tt.expectedStatus, rr.Code, "Ошибка: некорректный статуса ответа")
 			if tt.expectedHeader != "" {
-				assert.Equal(t, tt.expectedHeader, rr.Header().Get("Location"), "Ошибка: хедер Location отсутвует")
+				assert.Equal(t, tt.expectedHeader, rr.Header().Get("Location"), "Ошибка: хедер Location отсутствует")
 			}
 
 			// Проверяем, что все ожидания по моку выполнены
