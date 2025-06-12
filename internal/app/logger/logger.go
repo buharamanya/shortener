@@ -82,14 +82,6 @@ func WithRequestLogging(h http.Handler) http.Handler {
 
 		duration := time.Since(start)
 
-		// Log.Info(
-		// 	"uri", r.RequestURI,
-		// 	"method", r.Method,
-		// 	"status", responseData.status, // получаем перехваченный код статуса ответа
-		// 	"duration", duration,
-		// 	"size", responseData.size, // получаем перехваченный размер ответа
-		// )
-
 		Log.Info("got incoming HTTP request",
 			zap.String("uri", r.RequestURI),
 			zap.String("method", r.Method),

@@ -13,6 +13,7 @@ func reset() {
 	os.Unsetenv("SERVER_ADDRESS")                                        // Очищаем переменные окружения
 	os.Unsetenv("BASE_URL")
 	os.Unsetenv("FILE_STORAGE_PATH")
+	os.Unsetenv("DATABASE_DSN")
 }
 
 func TestInitConfiguration_DefaultValues(t *testing.T) {
@@ -29,6 +30,7 @@ func TestInitConfiguration_DefaultValues(t *testing.T) {
 		ServerBaseURL:   defaultServerBaseURL,
 		RedirectBaseURL: defaultRedirectBaseURL,
 		StorageFileName: defaultStorageFileName,
+		DataBaseDSN:     defaultDataBaseDSN,
 	}
 
 	if !reflect.DeepEqual(config, expected) {
@@ -42,7 +44,7 @@ func TestInitConfiguration_CommandLineFlags(t *testing.T) {
 	// Сохраняем оригинальные аргументы и восстанавливаем их после теста
 	oldArgs := os.Args
 	defer func() { os.Args = oldArgs }()
-	os.Args = []string{"cmd", "-a=flag:8080", "-b=http://flag:8080", "-f=flag.txt"}
+	os.Args = []string{"cmd", "-a=flag:8080", "-b=http://flag:8080", "-f=flag.txt", "-d=flag_DATABASE_DSN"}
 
 	config := InitConfiguration()
 
@@ -50,6 +52,7 @@ func TestInitConfiguration_CommandLineFlags(t *testing.T) {
 		ServerBaseURL:   "flag:8080",
 		RedirectBaseURL: "http://flag:8080",
 		StorageFileName: "flag.txt",
+		DataBaseDSN:     "flag_DATABASE_DSN",
 	}
 
 	if !reflect.DeepEqual(config, expected) {
@@ -64,6 +67,7 @@ func TestInitConfiguration_EnvironmentVariables(t *testing.T) {
 	os.Setenv("SERVER_ADDRESS", "env:8080")
 	os.Setenv("BASE_URL", "http://env:8080")
 	os.Setenv("FILE_STORAGE_PATH", "env.txt")
+	os.Setenv("DATABASE_DSN", "env_DATABASE_DSN")
 
 	// Пустые аргументы командной строки
 	oldArgs := os.Args
@@ -76,6 +80,7 @@ func TestInitConfiguration_EnvironmentVariables(t *testing.T) {
 		ServerBaseURL:   "env:8080",
 		RedirectBaseURL: "http://env:8080",
 		StorageFileName: "env.txt",
+		DataBaseDSN:     "env_DATABASE_DSN",
 	}
 
 	if !reflect.DeepEqual(config, expected) {
@@ -90,11 +95,12 @@ func TestInitConfiguration_Priority(t *testing.T) {
 	os.Setenv("SERVER_ADDRESS", "env:8080")
 	os.Setenv("BASE_URL", "http://env:8080")
 	os.Setenv("FILE_STORAGE_PATH", "env.txt")
+	os.Setenv("DATABASE_DSN", "env_DATABASE_DSN")
 
 	// Сохраняем оригинальные аргументы и восстанавливаем их после теста
 	oldArgs := os.Args
 	defer func() { os.Args = oldArgs }()
-	os.Args = []string{"cmd", "-a=flag:8080", "-b=http://flag:8080", "-f=flag.txt"}
+	os.Args = []string{"cmd", "-a=flag:8080", "-b=http://flag:8080", "-f=flag.txt", "-d=flag_DATABASE_DSN"}
 
 	config := InitConfiguration()
 
@@ -103,6 +109,7 @@ func TestInitConfiguration_Priority(t *testing.T) {
 		ServerBaseURL:   "env:8080",
 		RedirectBaseURL: "http://env:8080",
 		StorageFileName: "env.txt",
+		DataBaseDSN:     "env_DATABASE_DSN",
 	}
 
 	if !reflect.DeepEqual(config, expected) {

@@ -2,8 +2,8 @@ package handlers
 
 import (
 	"compress/gzip"
+	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"strings"
 
@@ -88,7 +88,7 @@ func WithGzipMiddleware(next http.Handler) http.Handler {
 				err := cw.Close()
 
 				if err != nil {
-					log.Printf("failed to close compress writer: %v", err)
+					logger.Log.Warn(fmt.Sprintf("failed to close compress writer: %v", err))
 				}
 			}(cw)
 		}
@@ -104,7 +104,7 @@ func WithGzipMiddleware(next http.Handler) http.Handler {
 			cr, err := newCompressReader(r.Body)
 			if err != nil {
 				w.WriteHeader(http.StatusInternalServerError)
-				log.Printf("failed to create compress reader: %v", err)
+				logger.Log.Warn(fmt.Sprintf("failed to create compress reader: %v", err))
 				return
 			}
 
@@ -113,7 +113,7 @@ func WithGzipMiddleware(next http.Handler) http.Handler {
 				err := cr.Close()
 
 				if err != nil {
-					log.Printf("failed to close compress reader: %v", err)
+					logger.Log.Warn(fmt.Sprintf("failed to close compress reader: %v", err))
 				}
 			}(cr)
 		}

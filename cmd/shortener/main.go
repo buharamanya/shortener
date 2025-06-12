@@ -17,13 +17,18 @@ func main() {
 
 	var appConfig = config.InitConfiguration()
 
-	file, fileerr := os.OpenFile(appConfig.StorageFileName, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
-	if fileerr != nil {
-		log.Fatal("Ошибка запуска файлового хранилища:", fileerr)
+	file, err := os.OpenFile(appConfig.StorageFileName, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	if err != nil {
+		log.Fatal("Ошибка запуска файлового хранилища:", err)
 	}
 	defer file.Close()
 
 	repo := storage.NewInMemoryStorage(file)
+
+	var dbrepo *storage.DBStorage
+	if dbrepo, err = storage.NewDBStorage(appConfig.DataBaseDSN); err != nil {
+		log.Fatal("Ошибка инициализвции базы данных")
+	}
 
 	shortenHandler := handlers.NewShortenHandler(repo, appConfig.RedirectBaseURL)
 
@@ -32,10 +37,9 @@ func main() {
 	r.Post("/", shortenHandler.ShortenURL)
 	r.Get("/{shortCode}", handlers.NewRedirectHandler(repo).RedirectByShortURL)
 	r.Post("/api/shorten", shortenHandler.JSONShortenURL)
+	r.Get("/ping", handlers.PingHandler(dbrepo))
 
-	err := http.ListenAndServe(appConfig.ServerBaseURL, r)
-
-	if err != nil {
+	if err := http.ListenAndServe(appConfig.ServerBaseURL, r); err != nil {
 		log.Fatal("Ошибка запуска сервера:", err)
 	}
 }
