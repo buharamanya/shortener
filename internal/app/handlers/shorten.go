@@ -1,8 +1,10 @@
 package handlers
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/json"
 	"io"
 	"net/http"
 	"strings"
@@ -22,6 +24,12 @@ func NewShortenHandler(storage URLSaver, baseURL string) *ShortenHandler {
 		storage: storage,
 		baseURL: baseURL,
 	}
+}
+
+func getHash(urlStr string) string {
+	hash := sha256.Sum256([]byte(urlStr))
+	shortCode := base64.URLEncoding.EncodeToString(hash[:6])
+	return strings.TrimRight(shortCode, "=")
 }
 
 func (sh *ShortenHandler) ShortenURL(w http.ResponseWriter, r *http.Request) {
@@ -49,16 +57,92 @@ func (sh *ShortenHandler) ShortenURL(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// генерируем короткий код
-	hash := sha256.Sum256([]byte(urlStr))
-	shortCode := base64.URLEncoding.EncodeToString(hash[:6])
-	shortCode = strings.TrimRight(shortCode, "=")
+	shortCode := getHash(urlStr)
 
 	// сохраняем в хранилище
 	shortURL := sh.baseURL + "/" + shortCode
-	sh.storage.Save(shortCode, urlStr)
+	err = sh.storage.Save(shortCode, urlStr)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 
 	// возвращаем ответ
 	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusCreated)
 	w.Write([]byte(shortURL))
+}
+
+type ShortenlURLRequest struct {
+	URL string `json:"url"`
+}
+
+type ShortenlURLResponce struct {
+	Result string `json:"result"`
+}
+
+func isJSONContentType(r *http.Request) bool {
+	contentType := r.Header.Get("Content-Type")
+	return strings.HasPrefix(contentType, "application/json")
+}
+
+func (sh *ShortenHandler) JSONShortenURL(w http.ResponseWriter, r *http.Request) {
+	// проверяем метод запроса
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	// проверяем тип содержимого
+	if !isJSONContentType(r) {
+		w.WriteHeader(http.StatusUnsupportedMediaType)
+		return
+	}
+
+	var reqDto ShortenlURLRequest
+	var buf bytes.Buffer
+	// читаем тело запроса
+	_, err := buf.ReadFrom(r.Body)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// десериализуем JSON
+	if err = json.Unmarshal(buf.Bytes(), &reqDto); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	defer r.Body.Close()
+
+	// читаем тело запроса
+
+	urlStr := strings.TrimSpace(string(reqDto.URL))
+
+	// проверяем что URL не пустой
+	if urlStr == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte("URL cannot be empty"))
+		return
+	}
+
+	// генерируем короткий код
+	shortCode := getHash(urlStr)
+
+	// создаем и сохраняем в хранилище короткую ссылку
+	shortURL := sh.baseURL + "/" + shortCode
+	err = sh.storage.Save(shortCode, urlStr)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// возвращаем ответ
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+
+	var respDto = ShortenlURLResponce{
+		Result: shortURL,
+	}
+	resp, _ := json.Marshal(respDto)
+	w.Write(resp)
 }
