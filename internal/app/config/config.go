@@ -9,7 +9,7 @@ const (
 	defaultServerBaseURL   = "localhost:8080"
 	defaultRedirectBaseURL = "http://localhost:8080"
 	defaultStorageFileName = "storage.txt"
-	defaultDataBaseDSN     = "DATABASE_DSN" // поменять на следующих итерациях
+	defaultDataBaseDSN     = "" // поменять на следующих итерациях
 )
 
 type AppConfig struct {

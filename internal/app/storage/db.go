@@ -2,30 +2,57 @@ package storage
 
 import (
 	"database/sql"
-	"fmt"
 
+	"github.com/buharamanya/shortener/internal/app/logger"
 	_ "github.com/jackc/pgx/v5/stdlib"
+	"go.uber.org/zap"
 )
 
 type DBStorage struct {
 	*sql.DB
 }
 
-func NewDBStorage(dbDSN string) (*DBStorage, error) {
+func NewDBStorage(dbDSN string) *DBStorage {
 	db, err := sql.Open("pgx", dbDSN)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open db connection: %w", err)
+		logger.Log.Fatal("Ошибка инициализации базы данных", zap.Error(err))
+	}
+
+	createTableQuery := `
+	CREATE TABLE IF NOT EXISTS shorturl (
+		hash VARCHAR(20) PRIMARY KEY,
+		url VARCHAR NOT NULL
+	);`
+
+	if _, err = db.Exec(createTableQuery); err != nil {
+		logger.Log.Fatal("Ошибка инициализации базы данных", zap.Error(err))
 	}
 
 	return &DBStorage{
 		DB: db,
-	}, nil
+	}
 }
 
-func (s *DBStorage) Save(shortURL string, originalURL string) error {
-	return nil
+func (db *DBStorage) Save(shortCode string, originalURL string) error {
+	query := `
+        INSERT INTO shorturl (hash, url)
+        VALUES ($1, $2)
+        ON CONFLICT (hash)
+        DO UPDATE SET
+            url = EXCLUDED.url`
+
+	_, err := db.Exec(query, shortCode, originalURL)
+	return err
 }
 
-func (s *DBStorage) Get(shortURL string) (string, error) {
-	return "", nil
+func (db *DBStorage) Get(shortCode string) (string, error) {
+	query := `SELECT url FROM shorturl WHERE hash = $1`
+	row := db.QueryRow(query, shortCode)
+	var url string
+	err := row.Scan(&url)
+	if err != nil {
+		logger.Log.Error("Не нашел записи по запросу", zap.Error(err))
+		return "", err
+	}
+	return url, nil
 }

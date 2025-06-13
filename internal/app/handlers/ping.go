@@ -8,8 +8,14 @@ import (
 	"go.uber.org/zap"
 )
 
-func PingHandler(db *storage.DBStorage) http.HandlerFunc {
+func PingHandler(s storage.URLStorage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		db, ok := s.(*storage.DBStorage)
+		if !ok {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
 		err := db.Ping()
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
