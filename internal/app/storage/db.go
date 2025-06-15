@@ -22,7 +22,7 @@ func NewDBStorage(dbDSN string) *DBStorage {
 	CREATE TABLE IF NOT EXISTS shorturl (
 		short_code 		VARCHAR(20) 	NOT NULL,
 		url  			VARCHAR 		NOT NULL UNIQUE,
-		correlation_id  VARCHAR(32)		
+		correlation_id  VARCHAR(200)		
 	)`
 
 	if _, err = db.Exec(createTableQuery); err != nil {
