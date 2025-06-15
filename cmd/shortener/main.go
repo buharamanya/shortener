@@ -37,6 +37,7 @@ func main() {
 	r.Post("/", shortenHandler.ShortenURL)
 	r.Get("/{shortCode}", handlers.NewRedirectHandler(repo).RedirectByShortURL)
 	r.Post("/api/shorten", shortenHandler.JSONShortenURL)
+	r.Post("/api/shorten/batch", shortenHandler.JSONShortenBatchURL)
 	r.Get("/ping", handlers.PingHandler(repo))
 
 	if err := http.ListenAndServe(appConfig.ServerBaseURL, r); err != nil {

@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/buharamanya/shortener/internal/app/logger"
+	"github.com/google/uuid"
 )
 
 // InMemoryStorage - реализация хранилища в памяти
@@ -37,7 +38,7 @@ func NewInMemoryStorage(file *os.File) *InMemoryStorage {
 			continue
 		}
 
-		urls[record.ShortURL] = record.OriginalURL
+		urls[record.ShortCode] = record.OriginalURL
 	}
 
 	return &InMemoryStorage{
@@ -47,13 +48,24 @@ func NewInMemoryStorage(file *os.File) *InMemoryStorage {
 }
 
 func (s *InMemoryStorage) Save(shortCode string, originalURL string) error {
+	correlationID := uuid.New().String()
 	s.urls[shortCode] = originalURL
 	record := ShortURLRecord{
 		shortCode,
 		originalURL,
+		correlationID,
 	}
 	encoder := json.NewEncoder(&s.file)
 	encoder.Encode(record)
+	return nil
+}
+
+func (s *InMemoryStorage) SaveBatch(records []ShortURLRecord) error {
+	for _, v := range records {
+		s.urls[v.ShortCode] = v.OriginalURL
+		encoder := json.NewEncoder(&s.file)
+		encoder.Encode(v)
+	}
 	return nil
 }
 

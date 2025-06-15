@@ -16,3 +16,8 @@ func (m *MockURLStorage) Save(shortCode, originalURL string) error {
 	args := m.Called(shortCode, originalURL)
 	return args.Error(0)
 }
+
+func (m *MockURLStorage) SaveBatch(records []ShortURLRecord) error {
+	args := m.Called(records)
+	return args.Error(0)
+}

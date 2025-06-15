@@ -8,10 +8,15 @@ import (
 	"io"
 	"net/http"
 	"strings"
+
+	"github.com/buharamanya/shortener/internal/app/logger"
+	"github.com/buharamanya/shortener/internal/app/storage"
+	"go.uber.org/zap"
 )
 
 type URLSaver interface {
 	Save(shortCode string, originalURL string) error
+	SaveBatch(records []storage.ShortURLRecord) error
 }
 
 type ShortenHandler struct {
@@ -145,4 +150,68 @@ func (sh *ShortenHandler) JSONShortenURL(w http.ResponseWriter, r *http.Request)
 	}
 	resp, _ := json.Marshal(respDto)
 	w.Write(resp)
+}
+
+type ShortenlURLBatchRequest struct {
+	CorrelationID string `json:"correlation_id"`
+	OriginalURL   string `json:"original_url"`
+}
+
+type ShortenlURLBatchResponce struct {
+	CorrelationID string `json:"correlation_id"`
+	ShortURL      string `json:"short_url"`
+}
+
+func (sh *ShortenHandler) JSONShortenBatchURL(w http.ResponseWriter, r *http.Request) {
+
+	var req []ShortenlURLBatchRequest
+
+	dec := json.NewDecoder(r.Body)
+	if err := dec.Decode(&req); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		logger.Log.Error("failed to read request body", zap.Error(err))
+		return
+	}
+
+	var records []storage.ShortURLRecord
+
+	for _, v := range req {
+		records = append(
+			records,
+			storage.ShortURLRecord{
+				OriginalURL:   v.OriginalURL,
+				CorrelationID: v.CorrelationID,
+				ShortCode:     getHash(v.OriginalURL),
+			},
+		)
+	}
+
+	err := sh.storage.SaveBatch(records)
+	if err != nil {
+		logger.Log.Error("Ошибка сохранения группы записей", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	var resp []ShortenlURLBatchResponce
+
+	for _, v := range records {
+		resp = append(
+			resp,
+			ShortenlURLBatchResponce{
+				CorrelationID: v.CorrelationID,
+				ShortURL:      sh.baseURL + "/" + v.ShortCode,
+			},
+		)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+
+	enc := json.NewEncoder(w)
+	if err := enc.Encode(resp); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		logger.Log.Error("error encoding response", zap.Error(err))
+		return
+	}
 }
