@@ -5,12 +5,15 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"strings"
 
 	"github.com/buharamanya/shortener/internal/app/logger"
 	"github.com/buharamanya/shortener/internal/app/storage"
+	"github.com/jackc/pgerrcode"
+	"github.com/jackc/pgx/v5/pgconn"
 	"go.uber.org/zap"
 )
 
@@ -68,6 +71,13 @@ func (sh *ShortenHandler) ShortenURL(w http.ResponseWriter, r *http.Request) {
 	shortURL := sh.baseURL + "/" + shortCode
 	err = sh.storage.Save(shortCode, urlStr)
 	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation {
+			w.Header().Set("Content-Type", "text/plain")
+			w.WriteHeader(http.StatusConflict)
+			w.Write([]byte(shortURL))
+			return
+		}
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 
@@ -136,9 +146,25 @@ func (sh *ShortenHandler) JSONShortenURL(w http.ResponseWriter, r *http.Request)
 	// создаем и сохраняем в хранилище короткую ссылку
 	shortURL := sh.baseURL + "/" + shortCode
 	err = sh.storage.Save(shortCode, urlStr)
+	// if err != nil {
+	// 	http.Error(w, err.Error(), http.StatusInternalServerError)
+	// 	return
+	// }
+
 	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusConflict)
+
+			var respDto = ShortenlURLResponce{
+				Result: shortURL,
+			}
+			resp, _ := json.Marshal(respDto)
+			w.Write(resp)
+			return
+		}
 		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
 	}
 
 	// возвращаем ответ
