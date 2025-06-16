@@ -146,10 +146,6 @@ func (sh *ShortenHandler) JSONShortenURL(w http.ResponseWriter, r *http.Request)
 	// создаем и сохраняем в хранилище короткую ссылку
 	shortURL := sh.baseURL + "/" + shortCode
 	err = sh.storage.Save(shortCode, urlStr)
-	// if err != nil {
-	// 	http.Error(w, err.Error(), http.StatusInternalServerError)
-	// 	return
-	// }
 
 	if err != nil {
 		var pgErr *pgconn.PgError
