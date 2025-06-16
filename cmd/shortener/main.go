@@ -17,13 +17,18 @@ func main() {
 
 	var appConfig = config.InitConfiguration()
 
-	file, fileerr := os.OpenFile(appConfig.StorageFileName, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
-	if fileerr != nil {
-		log.Fatal("Ошибка запуска файлового хранилища:", fileerr)
-	}
-	defer file.Close()
+	var repo storage.URLStorage
 
-	repo := storage.NewInMemoryStorage(file)
+	if appConfig.DataBaseDSN == "" {
+		file, err := os.OpenFile(appConfig.StorageFileName, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+		if err != nil {
+			log.Fatal("Ошибка запуска файлового хранилища:", err)
+		}
+		defer file.Close()
+		repo = storage.NewInMemoryStorage(file)
+	} else {
+		repo = storage.NewDBStorage(appConfig.DataBaseDSN)
+	}
 
 	shortenHandler := handlers.NewShortenHandler(repo, appConfig.RedirectBaseURL)
 
@@ -32,10 +37,10 @@ func main() {
 	r.Post("/", shortenHandler.ShortenURL)
 	r.Get("/{shortCode}", handlers.NewRedirectHandler(repo).RedirectByShortURL)
 	r.Post("/api/shorten", shortenHandler.JSONShortenURL)
+	r.Post("/api/shorten/batch", shortenHandler.JSONShortenBatchURL)
+	r.Get("/ping", handlers.PingHandler(repo))
 
-	err := http.ListenAndServe(appConfig.ServerBaseURL, r)
-
-	if err != nil {
+	if err := http.ListenAndServe(appConfig.ServerBaseURL, r); err != nil {
 		log.Fatal("Ошибка запуска сервера:", err)
 	}
 }
