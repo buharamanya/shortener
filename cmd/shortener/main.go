@@ -48,7 +48,7 @@ func main() {
 	})
 
 	r.Group(func(r chi.Router) {
-		r.Use(auth.WithCheckAuthMiddleware())
+		r.Use(auth.WithAuthMiddleware(), auth.WithCheckAuthMiddleware())
 		r.Get("/api/user/urls", handlers.APIFetchUserURLsHandler(repo))
 	})
 
