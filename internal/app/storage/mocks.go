@@ -1,6 +1,8 @@
 package storage
 
-import "github.com/stretchr/testify/mock"
+import (
+	"github.com/stretchr/testify/mock"
+)
 
 // MockURLStorage реализует URLStorage для тестов.
 type MockURLStorage struct {
@@ -12,8 +14,8 @@ func (m *MockURLStorage) Get(shortCode string) (string, error) {
 	return args.String(0), args.Error(1)
 }
 
-func (m *MockURLStorage) Save(shortCode, originalURL string) error {
-	args := m.Called(shortCode, originalURL)
+func (m *MockURLStorage) Save(record ShortURLRecord) error {
+	args := m.Called(record)
 	return args.Error(0)
 }
 

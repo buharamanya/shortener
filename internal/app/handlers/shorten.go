@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/buharamanya/shortener/internal/app/auth"
 	"github.com/buharamanya/shortener/internal/app/logger"
 	"github.com/buharamanya/shortener/internal/app/storage"
 	"github.com/jackc/pgerrcode"
@@ -18,7 +19,7 @@ import (
 )
 
 type URLSaver interface {
-	Save(shortCode string, originalURL string) error
+	Save(storage.ShortURLRecord) error
 	SaveBatch(records []storage.ShortURLRecord) error
 }
 
@@ -69,7 +70,14 @@ func (sh *ShortenHandler) ShortenURL(w http.ResponseWriter, r *http.Request) {
 
 	// сохраняем в хранилище
 	shortURL := sh.baseURL + "/" + shortCode
-	err = sh.storage.Save(shortCode, urlStr)
+
+	record := storage.ShortURLRecord{
+		ShortCode:   shortCode,
+		OriginalURL: urlStr,
+		UserID:      r.Context().Value(auth.UserIDContextKey).(string),
+	}
+
+	err = sh.storage.Save(record)
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation {
@@ -145,7 +153,14 @@ func (sh *ShortenHandler) JSONShortenURL(w http.ResponseWriter, r *http.Request)
 
 	// создаем и сохраняем в хранилище короткую ссылку
 	shortURL := sh.baseURL + "/" + shortCode
-	err = sh.storage.Save(shortCode, urlStr)
+
+	record := storage.ShortURLRecord{
+		ShortCode:   shortCode,
+		OriginalURL: urlStr,
+		UserID:      r.Context().Value(auth.UserIDContextKey).(string),
+	}
+
+	err = sh.storage.Save(record)
 
 	if err != nil {
 		var pgErr *pgconn.PgError
@@ -174,16 +189,6 @@ func (sh *ShortenHandler) JSONShortenURL(w http.ResponseWriter, r *http.Request)
 	w.Write(resp)
 }
 
-type ShortenlURLBatchRequest struct {
-	CorrelationID string `json:"correlation_id"`
-	OriginalURL   string `json:"original_url"`
-}
-
-type ShortenlURLBatchResponce struct {
-	CorrelationID string `json:"correlation_id"`
-	ShortURL      string `json:"short_url"`
-}
-
 func (sh *ShortenHandler) JSONShortenBatchURL(w http.ResponseWriter, r *http.Request) {
 
 	var req []ShortenlURLBatchRequest
@@ -204,6 +209,7 @@ func (sh *ShortenHandler) JSONShortenBatchURL(w http.ResponseWriter, r *http.Req
 				OriginalURL:   v.OriginalURL,
 				CorrelationID: v.CorrelationID,
 				ShortCode:     getHash(v.OriginalURL),
+				UserID:        r.Context().Value(auth.UserIDContextKey).(string),
 			},
 		)
 	}

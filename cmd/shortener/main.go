@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/buharamanya/shortener/internal/app/auth"
 	"github.com/buharamanya/shortener/internal/app/config"
 	"github.com/buharamanya/shortener/internal/app/handlers"
 	"github.com/buharamanya/shortener/internal/app/logger"
@@ -33,12 +34,23 @@ func main() {
 	shortenHandler := handlers.NewShortenHandler(repo, appConfig.RedirectBaseURL)
 
 	r := chi.NewRouter()
+
 	r.Use(handlers.WithGzipMiddleware, logger.WithRequestLogging)
-	r.Post("/", shortenHandler.ShortenURL)
-	r.Get("/{shortCode}", handlers.NewRedirectHandler(repo).RedirectByShortURL)
-	r.Post("/api/shorten", shortenHandler.JSONShortenURL)
-	r.Post("/api/shorten/batch", shortenHandler.JSONShortenBatchURL)
+
 	r.Get("/ping", handlers.PingHandler(repo))
+
+	r.Group(func(r chi.Router) {
+		r.Use(auth.WithAuthMiddleware())
+		r.Post("/", shortenHandler.ShortenURL)
+		r.Get("/{shortCode}", handlers.NewRedirectHandler(repo).RedirectByShortURL)
+		r.Post("/api/shorten", shortenHandler.JSONShortenURL)
+		r.Post("/api/shorten/batch", shortenHandler.JSONShortenBatchURL)
+	})
+
+	r.Group(func(r chi.Router) {
+		r.Use(auth.WithCheckAuthMiddleware())
+		r.Get("/api/user/urls", handlers.APIFetchUserURLsHandler(repo))
+	})
 
 	if err := http.ListenAndServe(appConfig.ServerBaseURL, r); err != nil {
 		log.Fatal("Ошибка запуска сервера:", err)

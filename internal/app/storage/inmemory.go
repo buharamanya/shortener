@@ -14,12 +14,12 @@ import (
 // InMemoryStorage - реализация хранилища в памяти
 type InMemoryStorage struct {
 	file os.File
-	urls map[string]string
+	urls map[string]ShortURLRecord
 }
 
 func NewInMemoryStorage(file *os.File) *InMemoryStorage {
 
-	urls := make(map[string]string)
+	urls := make(map[string]ShortURLRecord)
 
 	if _, err := file.Seek(0, 0); err != nil {
 		logger.Log.Fatal("не удалось перейти в начало файла")
@@ -38,7 +38,7 @@ func NewInMemoryStorage(file *os.File) *InMemoryStorage {
 			continue
 		}
 
-		urls[record.ShortCode] = record.OriginalURL
+		urls[record.ShortCode] = record
 	}
 
 	return &InMemoryStorage{
@@ -47,14 +47,9 @@ func NewInMemoryStorage(file *os.File) *InMemoryStorage {
 	}
 }
 
-func (s *InMemoryStorage) Save(shortCode string, originalURL string) error {
-	correlationID := uuid.New().String()
-	s.urls[shortCode] = originalURL
-	record := ShortURLRecord{
-		shortCode,
-		originalURL,
-		correlationID,
-	}
+func (s *InMemoryStorage) Save(record ShortURLRecord) error {
+	record.CorrelationID = uuid.New().String()
+	s.urls[record.ShortCode] = record
 	encoder := json.NewEncoder(&s.file)
 	encoder.Encode(record)
 	return nil
@@ -62,7 +57,7 @@ func (s *InMemoryStorage) Save(shortCode string, originalURL string) error {
 
 func (s *InMemoryStorage) SaveBatch(records []ShortURLRecord) error {
 	for _, v := range records {
-		s.urls[v.ShortCode] = v.OriginalURL
+		s.urls[v.ShortCode] = v
 		encoder := json.NewEncoder(&s.file)
 		encoder.Encode(v)
 	}
@@ -74,5 +69,15 @@ func (s *InMemoryStorage) Get(shortCode string) (string, error) {
 	if !exists {
 		return "", ErrNotFound
 	}
-	return url, nil
+	return url.OriginalURL, nil
+}
+
+func (s *InMemoryStorage) GetURLsByUserID(userID string) ([]ShortURLRecord, error) {
+	var userURLs []ShortURLRecord
+	for _, v := range s.urls {
+		if v.UserID == userID {
+			userURLs = append(userURLs, v)
+		}
+	}
+	return userURLs, nil
 }
