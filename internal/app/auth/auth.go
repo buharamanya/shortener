@@ -68,9 +68,14 @@ func WithCheckAuthMiddleware() func(next http.Handler) http.Handler {
 			authCookie, cookieErr := r.Cookie("AUTH_TOKEN")
 
 			if cookieErr != nil {
-				w.WriteHeader(http.StatusUnauthorized)
-				logger.Log.Error("failed to fetch auth token", zap.Error(cookieErr))
-				return
+				if cookieErr == http.ErrNoCookie {
+					authCookie, _ = setAuthCookie(w)
+				} else {
+					w.WriteHeader(http.StatusUnauthorized)
+					logger.Log.Error("failed to fetch auth token", zap.Error(cookieErr))
+					return
+				}
+
 			}
 
 			userID := getUserID(authCookie.Value)
