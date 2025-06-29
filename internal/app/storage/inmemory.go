@@ -69,6 +69,9 @@ func (s *InMemoryStorage) Get(shortCode string) (string, error) {
 	if !exists {
 		return "", ErrNotFound
 	}
+	if url.DeletedFlag == true {
+		return "", ErrDeleted
+	}
 	return url.OriginalURL, nil
 }
 
@@ -80,4 +83,19 @@ func (s *InMemoryStorage) GetURLsByUserID(userID string) ([]ShortURLRecord, erro
 		}
 	}
 	return userURLs, nil
+}
+
+func (s *InMemoryStorage) DeleteURLs(shortCodes []string, userID string) error {
+
+	for _, v := range shortCodes {
+		record, ok := s.urls[v]
+		if ok && record.UserID == userID {
+			record.DeletedFlag = true
+			s.urls[v] = record
+			encoder := json.NewEncoder(&s.file)
+			encoder.Encode(record)
+		}
+	}
+
+	return nil
 }

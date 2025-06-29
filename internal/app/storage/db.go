@@ -3,6 +3,8 @@ package storage
 import (
 	"database/sql"
 	"fmt"
+	"strconv"
+	"strings"
 
 	"github.com/buharamanya/shortener/internal/app/logger"
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -24,7 +26,8 @@ func NewDBStorage(dbDSN string) *DBStorage {
 		short_code 		VARCHAR(20) 	NOT NULL,
 		url  			VARCHAR 		NOT NULL UNIQUE,
 		correlation_id  VARCHAR(200),
-		user_id			VARCHAR(100)		
+		user_id			VARCHAR(100),
+		is_deleted		BOOLEAN 		NOT NULL DEFAULT FALSE		
 	)`
 
 	if _, err = db.Exec(createTableQuery); err != nil {
@@ -62,13 +65,17 @@ func (db *DBStorage) SaveBatch(records []ShortURLRecord) error {
 }
 
 func (db *DBStorage) Get(shortCode string) (string, error) {
-	query := `SELECT url FROM shorturl WHERE short_code = $1 LIMIT 1`
+	query := `SELECT url, is_deleted FROM shorturl WHERE short_code = $1 LIMIT 1`
 	row := db.QueryRow(query, shortCode)
 	var url string
-	err := row.Scan(&url)
+	var isDeleted bool
+	err := row.Scan(&url, &isDeleted)
 	if err != nil {
 		logger.Log.Error("Не нашел записи по запросу", zap.Error(err))
 		return "", err
+	}
+	if isDeleted {
+		return "", ErrDeleted
 	}
 	return url, nil
 }
@@ -99,4 +106,27 @@ func (db *DBStorage) GetURLsByUserID(userID string) ([]ShortURLRecord, error) {
 	}
 
 	return urls, nil
+}
+
+func (db *DBStorage) DeleteURLs(shortCodes []string, userID string) error {
+
+	if len(shortCodes) == 0 {
+		return nil
+	}
+
+	query := `UPDATE shorturl SET is_deleted = true WHERE user_id = '` + userID + `' and short_code IN (` + placeholders(len(shortCodes)) + `)`
+	args := make([]interface{}, len(shortCodes))
+	for i, sc := range shortCodes {
+		args[i] = sc
+	}
+	_, err := db.Exec(query, args...)
+	return err
+}
+
+func placeholders(n int) string {
+	ph := make([]string, n)
+	for i := range ph {
+		ph[i] = "$" + strconv.Itoa(i+1)
+	}
+	return strings.Join(ph, ",")
 }

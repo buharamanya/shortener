@@ -45,6 +45,7 @@ func main() {
 		r.Get("/{shortCode}", handlers.NewRedirectHandler(repo).RedirectByShortURL)
 		r.Post("/api/shorten", shortenHandler.JSONShortenURL)
 		r.Post("/api/shorten/batch", shortenHandler.JSONShortenBatchURL)
+		r.Delete("/api/user/urls", handlers.APIDeleteUserURLsHandler(repo))
 	})
 
 	r.Group(func(r chi.Router) {

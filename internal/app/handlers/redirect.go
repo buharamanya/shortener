@@ -1,8 +1,11 @@
 package handlers
 
 import (
+	"errors"
 	"net/http"
 	"strings"
+
+	"github.com/buharamanya/shortener/internal/app/storage"
 )
 
 type URLGetter interface {
@@ -35,7 +38,11 @@ func (rh *RedirectHandler) RedirectByShortURL(w http.ResponseWriter, r *http.Req
 
 	originalURL, err := rh.storage.Get(shortCode)
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
+		if errors.Is(err, storage.ErrDeleted) {
+			w.WriteHeader(http.StatusGone)
+		} else {
+			w.WriteHeader(http.StatusBadRequest)
+		}
 		return
 	}
 
