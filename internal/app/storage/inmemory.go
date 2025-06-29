@@ -69,7 +69,7 @@ func (s *InMemoryStorage) Get(shortCode string) (string, error) {
 	if !exists {
 		return "", ErrNotFound
 	}
-	if url.DeletedFlag == true {
+	if url.DeletedFlag {
 		return "", ErrDeleted
 	}
 	return url.OriginalURL, nil
