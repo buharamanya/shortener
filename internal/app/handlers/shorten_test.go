@@ -2,12 +2,14 @@ package handlers
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
+	"github.com/buharamanya/shortener/internal/app/auth"
 	"github.com/buharamanya/shortener/internal/app/storage"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -28,7 +30,7 @@ func TestShortenURL(t *testing.T) {
 			body:   "https://example.com",
 			mockSetup: func(m *storage.MockURLStorage) {
 				// Ожидаем вызов Save с любым shortCode и URL
-				m.On("Save", mock.Anything, "https://example.com").Return(nil)
+				m.On("Save", mock.Anything).Return(nil)
 			},
 			expectedStatus: http.StatusCreated,
 			expectedBody:   "http://localhost/", // Без кода, так как он рандомный
@@ -67,9 +69,11 @@ func TestShortenURL(t *testing.T) {
 			tt.mockSetup(mockStorage)
 
 			req := httptest.NewRequest(tt.method, "/shorten", strings.NewReader(tt.body))
+			newContext := context.WithValue(req.Context(), auth.UserIDContextKey, "SuperUserID")
+			newRequest := req.WithContext(newContext)
 			rr := httptest.NewRecorder()
 
-			handler.ShortenURL(rr, req)
+			handler.ShortenURL(rr, newRequest)
 
 			// Проверяем статус и тело ответа
 			assert.Equal(t, tt.expectedStatus, rr.Code, "Ошибка: некорректный статуса ответа")
@@ -140,7 +144,7 @@ func TestJSONShortenURL(t *testing.T) {
 			contentType: "application/json",
 			body:        `{"url":"https://example.com"}`,
 			setupMock: func(ms *storage.MockURLStorage) {
-				ms.On("Save", mock.AnythingOfType("string"), "https://example.com").Return(nil)
+				ms.On("Save", mock.Anything).Return(nil)
 			},
 			expectedStatus: http.StatusCreated,
 			expectedBody:   `{"result":"http://localhost/`,
@@ -151,7 +155,7 @@ func TestJSONShortenURL(t *testing.T) {
 			contentType: "application/json",
 			body:        `{"url":"https://example.com"}`,
 			setupMock: func(ms *storage.MockURLStorage) {
-				ms.On("Save", mock.AnythingOfType("string"), "https://example.com").Return(errors.New("storage error"))
+				ms.On("Save", mock.Anything).Return(errors.New("storage error"))
 			},
 			expectedStatus: http.StatusInternalServerError,
 			expectedBody:   "",
@@ -172,9 +176,13 @@ func TestJSONShortenURL(t *testing.T) {
 
 			req := httptest.NewRequest(tt.method, "/api/shorten", strings.NewReader(tt.body))
 			req.Header.Set("Content-Type", tt.contentType)
+
+			newContext := context.WithValue(req.Context(), auth.UserIDContextKey, "SuperUserID")
+			newRequest := req.WithContext(newContext)
+
 			w := httptest.NewRecorder()
 
-			sh.JSONShortenURL(w, req)
+			sh.JSONShortenURL(w, newRequest)
 
 			resp := w.Result()
 			defer resp.Body.Close()
