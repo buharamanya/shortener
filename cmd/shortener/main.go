@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"net/http"
+	_ "net/http/pprof"
 	"os"
 
 	"github.com/buharamanya/shortener/internal/app/auth"
@@ -35,12 +36,16 @@ func main() {
 
 	r := chi.NewRouter()
 
-	r.Use(handlers.WithGzipMiddleware, logger.WithRequestLogging)
+	r.Use(logger.WithRequestLogging)
 
 	r.Get("/ping", handlers.PingHandler(repo))
 
 	r.Group(func(r chi.Router) {
-		r.Use(auth.WithAuthMiddleware())
+		r.Mount("/debug/pprof", http.DefaultServeMux)
+	})
+
+	r.Group(func(r chi.Router) {
+		r.Use(handlers.WithGzipMiddleware, auth.WithAuthMiddleware())
 		r.Post("/", shortenHandler.ShortenURL)
 		r.Get("/{shortCode}", handlers.NewRedirectHandler(repo).RedirectByShortURL)
 		r.Post("/api/shorten", shortenHandler.JSONShortenURL)
@@ -49,7 +54,7 @@ func main() {
 	})
 
 	r.Group(func(r chi.Router) {
-		r.Use(auth.WithCheckAuthMiddleware())
+		r.Use(handlers.WithGzipMiddleware, auth.WithCheckAuthMiddleware())
 		r.Get("/api/user/urls", handlers.APIFetchUserURLsHandler(repo))
 	})
 
