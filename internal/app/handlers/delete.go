@@ -9,6 +9,7 @@ import (
 	"go.uber.org/zap"
 )
 
+// удалятор.
 type URLDeleter interface {
 	DeleteURLs(shortCodes []string, userID string) error
 }

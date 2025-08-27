@@ -11,10 +11,12 @@ import (
 	"go.uber.org/zap"
 )
 
+// получатель.
 type URLGetterByUserID interface {
 	GetURLsByUserID(userID string) ([]storage.ShortURLRecord, error)
 }
 
+// получить урлы.
 func APIFetchUserURLsHandler(s URLGetterByUserID) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 

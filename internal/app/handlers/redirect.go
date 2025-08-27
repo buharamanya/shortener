@@ -8,20 +8,24 @@ import (
 	"github.com/buharamanya/shortener/internal/app/storage"
 )
 
+// получатель.
 type URLGetter interface {
 	Get(shortCode string) (string, error)
 }
 
+// тип хэндлер редиректор.
 type RedirectHandler struct {
 	storage URLGetter
 }
 
+// создать хэндлер редиректор.
 func NewRedirectHandler(storage URLGetter) *RedirectHandler {
 	return &RedirectHandler{
 		storage: storage,
 	}
 }
 
+// редирект.
 func (rh *RedirectHandler) RedirectByShortURL(w http.ResponseWriter, r *http.Request) {
 	// проверяем метод запроса
 	if r.Method != http.MethodGet {

@@ -11,10 +11,12 @@ import (
 	"go.uber.org/zap"
 )
 
+// type DBStorage struct.
 type DBStorage struct {
 	*sql.DB
 }
 
+// NewDBStorage.
 func NewDBStorage(dbDSN string) *DBStorage {
 	db, err := sql.Open("pgx", dbDSN)
 	if err != nil {
@@ -39,12 +41,14 @@ func NewDBStorage(dbDSN string) *DBStorage {
 	}
 }
 
+// сохранить.
 func (db *DBStorage) Save(record ShortURLRecord) error {
 	query := `INSERT INTO shorturl (short_code, url, user_id, correlation_id) VALUES ($1, $2, $3, $4)`
 	_, err := db.Exec(query, record.ShortCode, record.OriginalURL, record.UserID, record.CorrelationID)
 	return err
 }
 
+// много сохранить.
 func (db *DBStorage) SaveBatch(records []ShortURLRecord) error {
 	query := `INSERT INTO shorturl (short_code, url, correlation_id, user_id) VALUES ($1, $2, $3, $4)`
 	tx, err := db.Begin()
@@ -64,6 +68,7 @@ func (db *DBStorage) SaveBatch(records []ShortURLRecord) error {
 	return tx.Commit()
 }
 
+// получить.
 func (db *DBStorage) Get(shortCode string) (string, error) {
 	query := `SELECT url, is_deleted FROM shorturl WHERE short_code = $1 LIMIT 1`
 	row := db.QueryRow(query, shortCode)
@@ -80,6 +85,7 @@ func (db *DBStorage) Get(shortCode string) (string, error) {
 	return url, nil
 }
 
+// получить по пользаку.
 func (db *DBStorage) GetURLsByUserID(userID string) ([]ShortURLRecord, error) {
 	query := `SELECT short_code, url, correlation_id, user_id
 		FROM shorturl
@@ -108,6 +114,7 @@ func (db *DBStorage) GetURLsByUserID(userID string) ([]ShortURLRecord, error) {
 	return urls, nil
 }
 
+// удалить.
 func (db *DBStorage) DeleteURLs(shortCodes []string, userID string) error {
 
 	if len(shortCodes) == 0 {

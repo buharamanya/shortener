@@ -18,16 +18,19 @@ import (
 	"go.uber.org/zap"
 )
 
+// сохранитель.
 type URLSaver interface {
 	Save(storage.ShortURLRecord) error
 	SaveBatch(records []storage.ShortURLRecord) error
 }
 
+// тип сократитель.
 type ShortenHandler struct {
 	storage URLSaver
 	baseURL string
 }
 
+// создатель сократителя.
 func NewShortenHandler(storage URLSaver, baseURL string) *ShortenHandler {
 	return &ShortenHandler{
 		storage: storage,
@@ -35,12 +38,14 @@ func NewShortenHandler(storage URLSaver, baseURL string) *ShortenHandler {
 	}
 }
 
+// хэш вычислитель.
 func getHash(urlStr string) string {
 	hash := sha256.Sum256([]byte(urlStr))
 	shortCode := base64.URLEncoding.EncodeToString(hash[:6])
 	return strings.TrimRight(shortCode, "=")
 }
 
+// сократитель.
 func (sh *ShortenHandler) ShortenURL(w http.ResponseWriter, r *http.Request) {
 	// проверяем метод запроса
 	if r.Method != http.MethodPost {
@@ -95,19 +100,23 @@ func (sh *ShortenHandler) ShortenURL(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(shortURL))
 }
 
+// дто запроса на сокращение.
 type ShortenlURLRequest struct {
 	URL string `json:"url"`
 }
 
+// дто ответа на сокращение.
 type ShortenlURLResponce struct {
 	Result string `json:"result"`
 }
 
+// проверка на json.
 func isJSONContentType(r *http.Request) bool {
 	contentType := r.Header.Get("Content-Type")
 	return strings.HasPrefix(contentType, "application/json")
 }
 
+// сократитель для json.
 func (sh *ShortenHandler) JSONShortenURL(w http.ResponseWriter, r *http.Request) {
 	// проверяем метод запроса
 	if r.Method != http.MethodPost {
@@ -189,6 +198,7 @@ func (sh *ShortenHandler) JSONShortenURL(w http.ResponseWriter, r *http.Request)
 	w.Write(resp)
 }
 
+// json batch shortener.
 func (sh *ShortenHandler) JSONShortenBatchURL(w http.ResponseWriter, r *http.Request) {
 
 	var req []ShortenlURLBatchRequest

@@ -8,6 +8,7 @@ import (
 	"go.uber.org/zap"
 )
 
+// пинг.
 func PingHandler(s storage.URLStorage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		db, ok := s.(*storage.DBStorage)

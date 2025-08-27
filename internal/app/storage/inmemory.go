@@ -11,12 +11,13 @@ import (
 	"github.com/google/uuid"
 )
 
-// InMemoryStorage - реализация хранилища в памяти
+// InMemoryStorage - реализация хранилища в памяти.
 type InMemoryStorage struct {
 	file os.File
 	urls map[string]ShortURLRecord
 }
 
+// ну понятно же.
 func NewInMemoryStorage(file *os.File) *InMemoryStorage {
 
 	urls := make(map[string]ShortURLRecord)
@@ -47,6 +48,7 @@ func NewInMemoryStorage(file *os.File) *InMemoryStorage {
 	}
 }
 
+// прихранить.
 func (s *InMemoryStorage) Save(record ShortURLRecord) error {
 	record.CorrelationID = uuid.New().String()
 	s.urls[record.ShortCode] = record
@@ -55,6 +57,7 @@ func (s *InMemoryStorage) Save(record ShortURLRecord) error {
 	return nil
 }
 
+// прихранить много.
 func (s *InMemoryStorage) SaveBatch(records []ShortURLRecord) error {
 	for _, v := range records {
 		s.urls[v.ShortCode] = v
@@ -64,6 +67,7 @@ func (s *InMemoryStorage) SaveBatch(records []ShortURLRecord) error {
 	return nil
 }
 
+// получить.
 func (s *InMemoryStorage) Get(shortCode string) (string, error) {
 	url, exists := s.urls[shortCode]
 	if !exists {
@@ -85,6 +89,7 @@ func (s *InMemoryStorage) GetURLsByUserID(userID string) ([]ShortURLRecord, erro
 	return userURLs, nil
 }
 
+// удалить.
 func (s *InMemoryStorage) DeleteURLs(shortCodes []string, userID string) error {
 
 	for _, v := range shortCodes {
