@@ -79,6 +79,7 @@ func (s *InMemoryStorage) Get(shortCode string) (string, error) {
 	return url.OriginalURL, nil
 }
 
+// получить по пользаку.
 func (s *InMemoryStorage) GetURLsByUserID(userID string) ([]ShortURLRecord, error) {
 	var userURLs []ShortURLRecord
 	for _, v := range s.urls {
