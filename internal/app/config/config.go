@@ -13,6 +13,7 @@ const (
 	defaultSecretKey       = "secret"
 )
 
+// структура для конфига.
 type AppConfig struct {
 	ServerBaseURL   string
 	RedirectBaseURL string
@@ -21,8 +22,10 @@ type AppConfig struct {
 	SecretKey       string
 }
 
+// глобальный конфиг.
 var AppParams AppConfig
 
+// инит глобального конфига.
 func InitConfiguration() *AppConfig {
 
 	flag.StringVar(&AppParams.ServerBaseURL, "a", defaultServerBaseURL, "shortener server URL")

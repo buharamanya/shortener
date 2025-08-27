@@ -13,6 +13,7 @@ import (
 	"go.uber.org/zap"
 )
 
+// это claims.
 type Claims struct {
 	jwt.RegisteredClaims
 	UserID string
@@ -20,8 +21,10 @@ type Claims struct {
 
 type contextKey string
 
+// это UserIDContextKey.
 const UserIDContextKey contextKey = "userID"
 
+// это авторизация.
 func WithAuthMiddleware() func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -62,6 +65,7 @@ func WithAuthMiddleware() func(next http.Handler) http.Handler {
 	}
 }
 
+// проверка авторизации.
 func WithCheckAuthMiddleware() func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

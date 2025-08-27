@@ -13,6 +13,7 @@ type URLDeleter interface {
 	DeleteURLs(shortCodes []string, userID string) error
 }
 
+// Удаление сохраненных пользователем урлов.
 func APIDeleteUserURLsHandler(s URLDeleter) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
