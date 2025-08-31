@@ -5,20 +5,32 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"strings"
+
+	"github.com/buharamanya/shortener/internal/app/auth"
+	"github.com/buharamanya/shortener/internal/app/logger"
+	"github.com/buharamanya/shortener/internal/app/storage"
+	"github.com/jackc/pgerrcode"
+	"github.com/jackc/pgx/v5/pgconn"
+	"go.uber.org/zap"
 )
 
+// сохранитель.
 type URLSaver interface {
-	Save(shortCode string, originalURL string) error
+	Save(storage.ShortURLRecord) error
+	SaveBatch(records []storage.ShortURLRecord) error
 }
 
+// тип сократитель.
 type ShortenHandler struct {
 	storage URLSaver
 	baseURL string
 }
 
+// создатель сократителя.
 func NewShortenHandler(storage URLSaver, baseURL string) *ShortenHandler {
 	return &ShortenHandler{
 		storage: storage,
@@ -26,12 +38,14 @@ func NewShortenHandler(storage URLSaver, baseURL string) *ShortenHandler {
 	}
 }
 
+// хэш вычислитель.
 func getHash(urlStr string) string {
 	hash := sha256.Sum256([]byte(urlStr))
 	shortCode := base64.URLEncoding.EncodeToString(hash[:6])
 	return strings.TrimRight(shortCode, "=")
 }
 
+// сократитель.
 func (sh *ShortenHandler) ShortenURL(w http.ResponseWriter, r *http.Request) {
 	// проверяем метод запроса
 	if r.Method != http.MethodPost {
@@ -61,8 +75,22 @@ func (sh *ShortenHandler) ShortenURL(w http.ResponseWriter, r *http.Request) {
 
 	// сохраняем в хранилище
 	shortURL := sh.baseURL + "/" + shortCode
-	err = sh.storage.Save(shortCode, urlStr)
+
+	record := storage.ShortURLRecord{
+		ShortCode:   shortCode,
+		OriginalURL: urlStr,
+		UserID:      r.Context().Value(auth.UserIDContextKey).(string),
+	}
+
+	err = sh.storage.Save(record)
 	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation {
+			w.Header().Set("Content-Type", "text/plain")
+			w.WriteHeader(http.StatusConflict)
+			w.Write([]byte(shortURL))
+			return
+		}
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 
@@ -72,19 +100,23 @@ func (sh *ShortenHandler) ShortenURL(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(shortURL))
 }
 
+// дто запроса на сокращение.
 type ShortenlURLRequest struct {
 	URL string `json:"url"`
 }
 
+// дто ответа на сокращение.
 type ShortenlURLResponce struct {
 	Result string `json:"result"`
 }
 
+// проверка на json.
 func isJSONContentType(r *http.Request) bool {
 	contentType := r.Header.Get("Content-Type")
 	return strings.HasPrefix(contentType, "application/json")
 }
 
+// сократитель для json.
 func (sh *ShortenHandler) JSONShortenURL(w http.ResponseWriter, r *http.Request) {
 	// проверяем метод запроса
 	if r.Method != http.MethodPost {
@@ -130,10 +162,29 @@ func (sh *ShortenHandler) JSONShortenURL(w http.ResponseWriter, r *http.Request)
 
 	// создаем и сохраняем в хранилище короткую ссылку
 	shortURL := sh.baseURL + "/" + shortCode
-	err = sh.storage.Save(shortCode, urlStr)
+
+	record := storage.ShortURLRecord{
+		ShortCode:   shortCode,
+		OriginalURL: urlStr,
+		UserID:      r.Context().Value(auth.UserIDContextKey).(string),
+	}
+
+	err = sh.storage.Save(record)
+
 	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusConflict)
+
+			var respDto = ShortenlURLResponce{
+				Result: shortURL,
+			}
+			resp, _ := json.Marshal(respDto)
+			w.Write(resp)
+			return
+		}
 		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
 	}
 
 	// возвращаем ответ
@@ -145,4 +196,60 @@ func (sh *ShortenHandler) JSONShortenURL(w http.ResponseWriter, r *http.Request)
 	}
 	resp, _ := json.Marshal(respDto)
 	w.Write(resp)
+}
+
+// json batch shortener.
+func (sh *ShortenHandler) JSONShortenBatchURL(w http.ResponseWriter, r *http.Request) {
+
+	var req []ShortenlURLBatchRequest
+
+	dec := json.NewDecoder(r.Body)
+	if err := dec.Decode(&req); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		logger.Log.Error("failed to read request body", zap.Error(err))
+		return
+	}
+
+	var records []storage.ShortURLRecord
+
+	for _, v := range req {
+		records = append(
+			records,
+			storage.ShortURLRecord{
+				OriginalURL:   v.OriginalURL,
+				CorrelationID: v.CorrelationID,
+				ShortCode:     getHash(v.OriginalURL),
+				UserID:        r.Context().Value(auth.UserIDContextKey).(string),
+			},
+		)
+	}
+
+	err := sh.storage.SaveBatch(records)
+	if err != nil {
+		logger.Log.Error("Ошибка сохранения группы записей", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	var resp []ShortenlURLBatchResponce
+
+	for _, v := range records {
+		resp = append(
+			resp,
+			ShortenlURLBatchResponce{
+				CorrelationID: v.CorrelationID,
+				ShortURL:      sh.baseURL + "/" + v.ShortCode,
+			},
+		)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+
+	enc := json.NewEncoder(w)
+	if err := enc.Encode(resp); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		logger.Log.Error("error encoding response", zap.Error(err))
+		return
+	}
 }

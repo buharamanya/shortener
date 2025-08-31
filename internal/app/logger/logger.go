@@ -33,6 +33,7 @@ func Initialize(level string) error {
 	return nil
 }
 
+// кастомный респонсрайтер.
 type ResponseWriter interface {
 	Header() http.Header
 	Write([]byte) (int, error)
@@ -53,6 +54,7 @@ type (
 	}
 )
 
+// пишем ответ.
 func (r *loggingResponseWriter) Write(b []byte) (int, error) {
 	// записываем ответ, используя оригинальный http.ResponseWriter
 	size, err := r.ResponseWriter.Write(b)
@@ -60,12 +62,14 @@ func (r *loggingResponseWriter) Write(b []byte) (int, error) {
 	return size, err
 }
 
+// пишем код.
 func (r *loggingResponseWriter) WriteHeader(statusCode int) {
 	// записываем код статуса, используя оригинальный http.ResponseWriter
 	r.ResponseWriter.WriteHeader(statusCode)
 	r.responseData.status = statusCode // захватываем код статуса
 }
 
+// мидлварь для логирования запросов.
 func WithRequestLogging(h http.Handler) http.Handler {
 	logFn := func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
@@ -81,14 +85,6 @@ func WithRequestLogging(h http.Handler) http.Handler {
 		h.ServeHTTP(&lw, r) // внедряем реализацию http.ResponseWriter
 
 		duration := time.Since(start)
-
-		// Log.Info(
-		// 	"uri", r.RequestURI,
-		// 	"method", r.Method,
-		// 	"status", responseData.status, // получаем перехваченный код статуса ответа
-		// 	"duration", duration,
-		// 	"size", responseData.size, // получаем перехваченный размер ответа
-		// )
 
 		Log.Info("got incoming HTTP request",
 			zap.String("uri", r.RequestURI),

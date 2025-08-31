@@ -9,40 +9,59 @@ const (
 	defaultServerBaseURL   = "localhost:8080"
 	defaultRedirectBaseURL = "http://localhost:8080"
 	defaultStorageFileName = "storage.txt"
+	defaultDataBaseDSN     = "" // поменять на следующих итерациях
+	defaultSecretKey       = "secret"
 )
 
+// структура для конфига.
 type AppConfig struct {
 	ServerBaseURL   string
 	RedirectBaseURL string
 	StorageFileName string
+	DataBaseDSN     string
+	SecretKey       string
 }
 
+// глобальный конфиг.
+var AppParams AppConfig
+
+// инит глобального конфига.
 func InitConfiguration() *AppConfig {
 
-	var config AppConfig
-
-	flag.StringVar(&config.ServerBaseURL, "a", defaultServerBaseURL, "shortener server URL")
-	flag.StringVar(&config.RedirectBaseURL, "b", defaultRedirectBaseURL, "shortener redirect URL")
-	flag.StringVar(&config.StorageFileName, "f", defaultStorageFileName, "shortener storage filename")
+	flag.StringVar(&AppParams.ServerBaseURL, "a", defaultServerBaseURL, "shortener server URL")
+	flag.StringVar(&AppParams.RedirectBaseURL, "b", defaultRedirectBaseURL, "shortener redirect URL")
+	flag.StringVar(&AppParams.StorageFileName, "f", defaultStorageFileName, "shortener storage filename")
+	flag.StringVar(&AppParams.DataBaseDSN, "d", defaultDataBaseDSN, "shortener database DSN")
+	flag.StringVar(&AppParams.SecretKey, "s", defaultSecretKey, "key for JWT")
 
 	flag.Parse()
 
 	envServerBaseURL := os.Getenv("SERVER_ADDRESS")
 	envRedirectBaseURL := os.Getenv("BASE_URL")
 	envStorageFileName := os.Getenv("FILE_STORAGE_PATH")
+	envDataBaseDSN := os.Getenv("DATABASE_DSN")
+	envSecretKey := os.Getenv("SECRET_KEY")
 
 	if envServerBaseURL != "" {
-		config.ServerBaseURL = envServerBaseURL
+		AppParams.ServerBaseURL = envServerBaseURL
 	}
 
 	if envRedirectBaseURL != "" {
-		config.RedirectBaseURL = envRedirectBaseURL
+		AppParams.RedirectBaseURL = envRedirectBaseURL
 	}
 
 	if envStorageFileName != "" {
-		config.StorageFileName = envStorageFileName
+		AppParams.StorageFileName = envStorageFileName
 	}
 
-	return &config
+	if envDataBaseDSN != "" {
+		AppParams.DataBaseDSN = envDataBaseDSN
+	}
+
+	if envSecretKey != "" {
+		AppParams.SecretKey = envSecretKey
+	}
+
+	return &AppParams
 
 }
