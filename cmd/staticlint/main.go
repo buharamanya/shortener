@@ -21,6 +21,12 @@ import (
 	"honnef.co/go/tools/staticcheck"
 )
 
+// Config конфигурация анализаторов
+type Config struct {
+	StaticCheckAnalyzers map[string]bool
+	CustomAnalyzers      []*analysis.Analyzer
+}
+
 // exitCheckAnalyzer анализатор вызова os.Exit() функции в main пакете.
 var exitCheckAnalyzer = &analysis.Analyzer{
 	Name: "exitcheck",                      // имя анализатора.
@@ -29,77 +35,103 @@ var exitCheckAnalyzer = &analysis.Analyzer{
 }
 
 func main() {
-	staticchecks := map[string]bool{
-		"SA":     true,
-		"S1006":  true,
-		"ST1012": true,
+	config := Config{
+		StaticCheckAnalyzers: map[string]bool{
+			"SA":     true,
+			"S1006":  true,
+			"ST1012": true,
+		},
+		CustomAnalyzers: []*analysis.Analyzer{
+			copylock.Analyzer,  // checks for locks erroneously passed by value.
+			defers.Analyzer,    // checks for common mistakes in defer statements.
+			printf.Analyzer,    // checks consistency of Printf format strings and arguments.
+			shadow.Analyzer,    // checks for shadowed variables.
+			structtag.Analyzer, // checks struct field tags are well formed.
+			unmarshal.Analyzer, // checks for passing non-pointer or non-interface types to unmarshal and decode functions.
+			errcheck.Analyzer,  // checks unchecked errors in Go code.
+			gocc.Analyzer,      // checks cyclomatic complexity of go functions.
+			exitCheckAnalyzer,  // checks call os.Exit() function in main package.
+		},
 	}
 
-	mychecks := []*analysis.Analyzer{
-		copylock.Analyzer,  // checks for locks erroneously passed by value.
-		defers.Analyzer,    // checks for common mistakes in defer statements.
-		printf.Analyzer,    // checks consistency of Printf format strings and arguments.
-		shadow.Analyzer,    // checks for shadowed variables.
-		structtag.Analyzer, // checks struct field tags are well formed.
-		unmarshal.Analyzer, // checks for passing non-pointer or non-interface types to unmarshal and decode functions.
-		errcheck.Analyzer,  // checks unchecked errors in Go code.
-		gocc.Analyzer,      // checks cyclomatic complexity of go functions.
-		exitCheckAnalyzer,  // checks call os.Exit() function in main package.
-	}
+	mychecks := config.CustomAnalyzers
 
 	for _, v := range staticcheck.Analyzers {
-		if staticchecks[v.Analyzer.Name] {
+		if config.StaticCheckAnalyzers[v.Analyzer.Name] {
 			mychecks = append(mychecks, v.Analyzer)
 		}
 	}
 
-	multichecker.Main(
-		mychecks...,
-	)
+	multichecker.Main(mychecks...)
 }
 
 // run функция, которая отвечает за анализ исходного кода.
 func run(pass *analysis.Pass) (interface{}, error) {
 	for _, file := range pass.Files {
-		if file.Name.Name != "main" {
+		if !isMainPackage(file) {
 			continue
 		}
 
-		if osImportAbsent(file, file.Imports) {
+		if !hasOSImport(file.Imports) {
 			continue
 		}
 
-		ast.Inspect(file, func(node ast.Node) bool {
-			if call, ok := node.(*ast.CallExpr); ok {
-				if selector, ok := call.Fun.(*ast.SelectorExpr); ok {
-					if p, ok := selector.X.(*ast.Ident); ok {
-						if p.Name == "os" && selector.Sel.Name == "Exit" {
-							pass.Reportf(p.NamePos, "call os.Exit function")
-						}
-					}
-				}
-			}
-
-			return true
-		})
+		checkForOSExitCalls(pass, file)
 	}
 	return nil, nil
 }
 
-// osImportAbsent проверяет среди импортов наличие пакета os
-func osImportAbsent(f *ast.File, imports []*ast.ImportSpec) bool {
-	for _, importSpec := range imports {
-		if _, ok := f.Scope.Objects["tests"]; ok {
-			// Исключил попадаение
-			// ~/Library/Caches/go-build/ed/ed7616fad552f6e19a3945b71c97ae2f5f9ee5dbf7d548ed82c1d080d99bb245-d:47:2
-			continue
-		}
+// isMainPackage проверяет, является ли файл частью main пакета
+func isMainPackage(file *ast.File) bool {
+	return file.Name.Name == "main"
+}
 
-		lit := importSpec.Path
-		if lit != nil && lit.Value == "\"os\"" {
-			return false
+// hasOSImport проверяет среди импортов наличие пакета os
+func hasOSImport(imports []*ast.ImportSpec) bool {
+	for _, importSpec := range imports {
+		if importSpec.Path != nil && importSpec.Path.Value == "\"os\"" {
+			return true
 		}
 	}
+	return false
+}
 
-	return true
+// checkForOSExitCalls проверяет наличие вызовов os.Exit в AST дереве файла
+func checkForOSExitCalls(pass *analysis.Pass, file *ast.File) {
+	ast.Inspect(file, func(node ast.Node) bool {
+		callExpr, ok := node.(*ast.CallExpr)
+		if !ok {
+			return true
+		}
+
+		if isOSExitCall(callExpr) {
+			reportOSExitCall(pass, callExpr)
+		}
+
+		return true
+	})
+}
+
+// isOSExitCall проверяет, является ли вызов выражением os.Exit
+func isOSExitCall(callExpr *ast.CallExpr) bool {
+	selector, ok := callExpr.Fun.(*ast.SelectorExpr)
+	if !ok {
+		return false
+	}
+
+	ident, ok := selector.X.(*ast.Ident)
+	if !ok {
+		return false
+	}
+
+	return ident.Name == "os" && selector.Sel.Name == "Exit"
+}
+
+// reportOSExitCall сообщает о найденном вызове os.Exit
+func reportOSExitCall(pass *analysis.Pass, callExpr *ast.CallExpr) {
+	if selector, ok := callExpr.Fun.(*ast.SelectorExpr); ok {
+		if ident, ok := selector.X.(*ast.Ident); ok {
+			pass.Reportf(ident.NamePos, "call os.Exit function")
+		}
+	}
 }
