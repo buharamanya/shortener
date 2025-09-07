@@ -12,10 +12,22 @@ import (
 	"github.com/buharamanya/shortener/internal/app/logger"
 	"github.com/buharamanya/shortener/internal/app/storage"
 	"github.com/go-chi/chi/v5"
+	"go.uber.org/zap"
+)
+
+var (
+	buildVersion = "N/A"
+	buildDate    = "N/A"
+	buildCommit  = "N/A"
 )
 
 func main() {
+
 	logger.Initialize("info")
+
+	logger.Log.Info("Build info: ", zap.String("version", buildVersion))
+	logger.Log.Info("Build info: ", zap.String("date", buildDate))
+	logger.Log.Info("Build info: ", zap.String("commit", buildCommit))
 
 	var appConfig = config.InitConfiguration()
 
