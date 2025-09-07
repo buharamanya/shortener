@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"net/http"
 	_ "net/http/pprof"
@@ -13,6 +12,7 @@ import (
 	"github.com/buharamanya/shortener/internal/app/logger"
 	"github.com/buharamanya/shortener/internal/app/storage"
 	"github.com/go-chi/chi/v5"
+	"go.uber.org/zap"
 )
 
 var (
@@ -25,9 +25,9 @@ func main() {
 
 	logger.Initialize("info")
 
-	logger.Log.Info(fmt.Sprintf("Build version: %s", buildVersion))
-	logger.Log.Info(fmt.Sprintf("Build date: %s", buildDate))
-	logger.Log.Info(fmt.Sprintf("Build commit: %s", buildCommit))
+	logger.Log.Info("Build info: ", zap.String("version", buildVersion))
+	logger.Log.Info("Build info: ", zap.String("date", buildDate))
+	logger.Log.Info("Build info: ", zap.String("commit", buildCommit))
 
 	var appConfig = config.InitConfiguration()
 
