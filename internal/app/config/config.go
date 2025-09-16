@@ -11,6 +11,7 @@ const (
 	defaultStorageFileName = "storage.txt"
 	defaultDataBaseDSN     = "" // поменять на следующих итерациях
 	defaultSecretKey       = "secret"
+	defaultEnableHTTPS     = false
 )
 
 // структура для конфига.
@@ -20,6 +21,7 @@ type AppConfig struct {
 	StorageFileName string
 	DataBaseDSN     string
 	SecretKey       string
+	EnableHTTPS     bool
 }
 
 // глобальный конфиг.
@@ -32,7 +34,8 @@ func InitConfiguration() *AppConfig {
 	flag.StringVar(&AppParams.RedirectBaseURL, "b", defaultRedirectBaseURL, "shortener redirect URL")
 	flag.StringVar(&AppParams.StorageFileName, "f", defaultStorageFileName, "shortener storage filename")
 	flag.StringVar(&AppParams.DataBaseDSN, "d", defaultDataBaseDSN, "shortener database DSN")
-	flag.StringVar(&AppParams.SecretKey, "s", defaultSecretKey, "key for JWT")
+	flag.StringVar(&AppParams.SecretKey, "k", defaultSecretKey, "key for JWT")
+	flag.BoolVar(&AppParams.EnableHTTPS, "s", defaultEnableHTTPS, "enable HTTPS")
 
 	flag.Parse()
 
@@ -41,6 +44,7 @@ func InitConfiguration() *AppConfig {
 	envStorageFileName := os.Getenv("FILE_STORAGE_PATH")
 	envDataBaseDSN := os.Getenv("DATABASE_DSN")
 	envSecretKey := os.Getenv("SECRET_KEY")
+	envEnableHTTPS := os.Getenv("ENABLE_HTTPS")
 
 	if envServerBaseURL != "" {
 		AppParams.ServerBaseURL = envServerBaseURL
@@ -60,6 +64,10 @@ func InitConfiguration() *AppConfig {
 
 	if envSecretKey != "" {
 		AppParams.SecretKey = envSecretKey
+	}
+
+	if envEnableHTTPS == "true" || envEnableHTTPS == "1" {
+		AppParams.EnableHTTPS = true
 	}
 
 	return &AppParams

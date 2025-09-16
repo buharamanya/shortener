@@ -15,6 +15,7 @@ func reset() {
 	os.Unsetenv("FILE_STORAGE_PATH")
 	os.Unsetenv("DATABASE_DSN")
 	os.Unsetenv("SECRET_KEY")
+	os.Unsetenv("ENABLE_HTTPS")
 }
 
 func TestInitConfiguration_DefaultValues(t *testing.T) {
@@ -33,6 +34,7 @@ func TestInitConfiguration_DefaultValues(t *testing.T) {
 		StorageFileName: defaultStorageFileName,
 		DataBaseDSN:     defaultDataBaseDSN,
 		SecretKey:       defaultSecretKey,
+		EnableHTTPS:     defaultEnableHTTPS,
 	}
 
 	if !reflect.DeepEqual(config, expected) {
@@ -46,7 +48,7 @@ func TestInitConfiguration_CommandLineFlags(t *testing.T) {
 	// Сохраняем оригинальные аргументы и восстанавливаем их после теста
 	oldArgs := os.Args
 	defer func() { os.Args = oldArgs }()
-	os.Args = []string{"cmd", "-a=flag:8080", "-b=http://flag:8080", "-f=flag.txt", "-d=flag_DATABASE_DSN", "-s=flag_key"}
+	os.Args = []string{"cmd", "-a=flag:8080", "-b=http://flag:8080", "-f=flag.txt", "-d=flag_DATABASE_DSN", "-k=flag_key", "-s=true"}
 
 	config := InitConfiguration()
 
@@ -56,6 +58,7 @@ func TestInitConfiguration_CommandLineFlags(t *testing.T) {
 		StorageFileName: "flag.txt",
 		DataBaseDSN:     "flag_DATABASE_DSN",
 		SecretKey:       "flag_key",
+		EnableHTTPS:     true,
 	}
 
 	if !reflect.DeepEqual(config, expected) {
@@ -72,6 +75,7 @@ func TestInitConfiguration_EnvironmentVariables(t *testing.T) {
 	os.Setenv("FILE_STORAGE_PATH", "env.txt")
 	os.Setenv("DATABASE_DSN", "env_DATABASE_DSN")
 	os.Setenv("SECRET_KEY", "env_SECRET_KEY")
+	os.Setenv("ENABLE_HTTPS", "true")
 
 	// Пустые аргументы командной строки
 	oldArgs := os.Args
@@ -86,6 +90,7 @@ func TestInitConfiguration_EnvironmentVariables(t *testing.T) {
 		StorageFileName: "env.txt",
 		DataBaseDSN:     "env_DATABASE_DSN",
 		SecretKey:       "env_SECRET_KEY",
+		EnableHTTPS:     true,
 	}
 
 	if !reflect.DeepEqual(config, expected) {
@@ -102,11 +107,12 @@ func TestInitConfiguration_Priority(t *testing.T) {
 	os.Setenv("FILE_STORAGE_PATH", "env.txt")
 	os.Setenv("DATABASE_DSN", "env_DATABASE_DSN")
 	os.Setenv("SECRET_KEY", "env_SECRET_KEY")
+	os.Setenv("ENABLE_HTTPS", "true")
 
 	// Сохраняем оригинальные аргументы и восстанавливаем их после теста
 	oldArgs := os.Args
 	defer func() { os.Args = oldArgs }()
-	os.Args = []string{"cmd", "-a=flag:8080", "-b=http://flag:8080", "-f=flag.txt", "-d=flag_DATABASE_DSN", "-s=flag_key"}
+	os.Args = []string{"cmd", "-a=flag:8080", "-b=http://flag:8080", "-f=flag.txt", "-d=flag_DATABASE_DSN", "-k=flag_key", "-s=false"}
 
 	config := InitConfiguration()
 
@@ -117,9 +123,43 @@ func TestInitConfiguration_Priority(t *testing.T) {
 		StorageFileName: "env.txt",
 		DataBaseDSN:     "env_DATABASE_DSN",
 		SecretKey:       "env_SECRET_KEY",
+		EnableHTTPS:     true, // Переменная окружения имеет приоритет
 	}
 
 	if !reflect.DeepEqual(config, expected) {
 		t.Errorf("Ошибка приоритета выбора переменных. Ожидалось %v, получено %v", expected, config)
+	}
+}
+
+func TestInitConfiguration_EnableHTTPS_EnvironmentValues(t *testing.T) {
+	reset()
+
+	testCases := []struct {
+		name     string
+		envValue string
+		expected bool
+	}{
+		{"true value", "true", true},
+		{"1 value", "1", true},
+		{"false value", "false", false},
+		{"empty value", "", false},
+		{"other value", "yes", false},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			reset()
+			os.Setenv("ENABLE_HTTPS", tc.envValue)
+
+			oldArgs := os.Args
+			defer func() { os.Args = oldArgs }()
+			os.Args = []string{"cmd"}
+
+			config := InitConfiguration()
+
+			if config.EnableHTTPS != tc.expected {
+				t.Errorf("Для значения '%s' ожидалось %v, получено %v", tc.envValue, tc.expected, config.EnableHTTPS)
+			}
+		})
 	}
 }

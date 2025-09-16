@@ -6,6 +6,8 @@ import (
 	_ "net/http/pprof"
 	"os"
 
+	"golang.org/x/crypto/acme/autocert"
+
 	"github.com/buharamanya/shortener/internal/app/auth"
 	"github.com/buharamanya/shortener/internal/app/config"
 	"github.com/buharamanya/shortener/internal/app/handlers"
@@ -70,7 +72,56 @@ func main() {
 		r.Get("/api/user/urls", handlers.APIFetchUserURLsHandler(repo))
 	})
 
-	if err := http.ListenAndServe(appConfig.ServerBaseURL, r); err != nil {
-		log.Fatal("Ошибка запуска сервера:", err)
+	// Запуск сервера с поддержкой HTTPS через autocert
+	if appConfig.EnableHTTPS {
+		logger.Log.Info("Запуск сервера с HTTPS (autocert)", zap.String("address", appConfig.ServerBaseURL))
+
+		// Создаем менеджер TLS-сертификатов
+		manager := &autocert.Manager{
+			// Директория для хранения сертификатов
+			Cache: autocert.DirCache("certs"),
+			// Принимаем Terms of Service Let's Encrypt
+			Prompt: autocert.AcceptTOS,
+			// Для тестирования можно указать домен, в продакшене нужно указать реальные домены
+			// HostPolicy: autocert.HostWhitelist("your-domain.com", "www.your-domain.com"),
+			HostPolicy: autocert.HostWhitelist(),
+		}
+
+		// HTTP сервер для ACME challenge (проверка домена) на порту 80
+		go func() {
+			httpServer := &http.Server{
+				Addr:    ":80",
+				Handler: manager.HTTPHandler(nil),
+			}
+			logger.Log.Info("Запуск ACME challenge сервера на порту 80")
+			if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				logger.Log.Error("Ошибка ACME сервера", zap.Error(err))
+			}
+		}()
+
+		// HTTPS сервер с автоматическими сертификатами
+		server := &http.Server{
+			Addr:      appConfig.ServerBaseURL,
+			Handler:   r,
+			TLSConfig: manager.TLSConfig(),
+		}
+
+		logger.Log.Info("Запуск HTTPS сервера")
+		if err := server.ListenAndServeTLS("", ""); err != nil {
+			log.Fatal("Ошибка запуска HTTPS сервера:", err)
+		}
+
+	} else {
+		// Обычный HTTP сервер
+		logger.Log.Info("Запуск сервера с HTTP", zap.String("address", appConfig.ServerBaseURL))
+
+		server := &http.Server{
+			Addr:    appConfig.ServerBaseURL,
+			Handler: r,
+		}
+
+		if err := server.ListenAndServe(); err != nil {
+			log.Fatal("Ошибка запуска сервера:", err)
+		}
 	}
 }
