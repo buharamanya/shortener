@@ -1,10 +1,13 @@
 package main
 
 import (
-	"log"
+	"context"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"golang.org/x/crypto/acme/autocert"
 
@@ -24,7 +27,6 @@ var (
 )
 
 func main() {
-
 	logger.Initialize("info")
 
 	logger.Log.Info("Build info: ", zap.String("version", buildVersion))
@@ -38,13 +40,17 @@ func main() {
 	if appConfig.DataBaseDSN == "" {
 		file, err := os.OpenFile(appConfig.StorageFileName, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 		if err != nil {
-			log.Fatal("Ошибка запуска файлового хранилища:", err)
+			logger.Log.Fatal("Ошибка запуска файлового хранилища:", zap.Error(err))
 		}
-		defer file.Close()
 		repo = storage.NewInMemoryStorage(file)
 	} else {
-		repo = storage.NewDBStorage(appConfig.DataBaseDSN)
+		var err error
+		repo, err = storage.NewDBStorage(appConfig.DataBaseDSN)
+		if err != nil {
+			logger.Log.Fatal("Ошибка подключения к базе данных:", zap.Error(err))
+		}
 	}
+	defer repo.Close()
 
 	shortenHandler := handlers.NewShortenHandler(repo, appConfig.RedirectBaseURL)
 
@@ -72,56 +78,90 @@ func main() {
 		r.Get("/api/user/urls", handlers.APIFetchUserURLsHandler(repo))
 	})
 
-	// Запуск сервера с поддержкой HTTPS через autocert
-	if appConfig.EnableHTTPS {
-		logger.Log.Info("Запуск сервера с HTTPS (autocert)", zap.String("address", appConfig.ServerBaseURL))
+	// Создаем канал для сигналов ОС
+	signalChan := make(chan os.Signal, 1)
+	signal.Notify(signalChan, syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
 
-		// Создаем менеджер TLS-сертификатов
-		manager := &autocert.Manager{
-			// Директория для хранения сертификатов
-			Cache: autocert.DirCache("certs"),
-			// Принимаем Terms of Service Let's Encrypt
-			Prompt: autocert.AcceptTOS,
-			// Для тестирования можно указать домен, в продакшене нужно указать реальные домены
-			// HostPolicy: autocert.HostWhitelist("your-domain.com", "www.your-domain.com"),
-			HostPolicy: autocert.HostWhitelist(),
-		}
+	// Создаем контекст для graceful shutdown
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
-		// HTTP сервер для ACME challenge (проверка домена) на порту 80
-		go func() {
-			httpServer := &http.Server{
+	// Запускаем сервер в отдельной горутине
+	server := &http.Server{
+		Addr:    appConfig.ServerBaseURL,
+		Handler: r,
+	}
+
+	var serverErr error
+	serverStopped := make(chan struct{})
+
+	go func() {
+		if appConfig.EnableHTTPS {
+			logger.Log.Info("Запуск сервера с HTTPS (autocert)", zap.String("address", appConfig.ServerBaseURL))
+
+			// Создаем менеджер TLS-сертификатов
+			manager := &autocert.Manager{
+				Cache:      autocert.DirCache("certs"),
+				Prompt:     autocert.AcceptTOS,
+				HostPolicy: autocert.HostWhitelist(),
+			}
+
+			// HTTP сервер для ACME challenge на порту 80
+			acmeServer := &http.Server{
 				Addr:    ":80",
 				Handler: manager.HTTPHandler(nil),
 			}
-			logger.Log.Info("Запуск ACME challenge сервера на порту 80")
-			if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-				logger.Log.Error("Ошибка ACME сервера", zap.Error(err))
-			}
-		}()
 
-		// HTTPS сервер с автоматическими сертификатами
-		server := &http.Server{
-			Addr:      appConfig.ServerBaseURL,
-			Handler:   r,
-			TLSConfig: manager.TLSConfig(),
+			go func() {
+				logger.Log.Info("Запуск ACME challenge сервера на порту 80")
+				if err := acmeServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+					logger.Log.Error("Ошибка ACME сервера", zap.Error(err))
+				}
+			}()
+
+			// HTTPS сервер с автоматическими сертификатами
+			server.TLSConfig = manager.TLSConfig()
+			serverErr = server.ListenAndServeTLS("", "")
+		} else {
+			// Обычный HTTP сервер
+			logger.Log.Info("Запуск сервера с HTTP", zap.String("address", appConfig.ServerBaseURL))
+			serverErr = server.ListenAndServe()
 		}
 
-		logger.Log.Info("Запуск HTTPS сервера")
-		if err := server.ListenAndServeTLS("", ""); err != nil {
-			log.Fatal("Ошибка запуска HTTPS сервера:", err)
+		if serverErr != nil && serverErr != http.ErrServerClosed {
+			logger.Log.Error("Ошибка сервера", zap.Error(serverErr))
 		}
+		close(serverStopped)
+	}()
 
-	} else {
-		// Обычный HTTP сервер
-		logger.Log.Info("Запуск сервера с HTTP", zap.String("address", appConfig.ServerBaseURL))
-
-		server := &http.Server{
-			Addr:    appConfig.ServerBaseURL,
-			Handler: r,
-		}
-
-		if err := server.ListenAndServe(); err != nil {
-			log.Fatal("Ошибка запуска сервера:", err)
-		}
+	// Ожидаем сигнал или ошибку сервера
+	select {
+	case sig := <-signalChan:
+		logger.Log.Info("Получен сигнал завершения", zap.String("signal", sig.String()))
+	case <-serverStopped:
+		logger.Log.Info("Сервер остановился самостоятельно")
 	}
+
+	// Инициируем graceful shutdown
+	logger.Log.Info("Начинаем graceful shutdown...")
+
+	// Создаем контекст с таймаутом для shutdown
+	shutdownCtx, shutdownCancel := context.WithTimeout(ctx, 30*time.Second)
+	defer shutdownCancel()
+
+	// Останавливаем сервер
+	if err := server.Shutdown(shutdownCtx); err != nil {
+		logger.Log.Error("Ошибка при graceful shutdown", zap.Error(err))
+	} else {
+		logger.Log.Info("Сервер успешно остановлен")
+	}
+
+	// Закрываем хранилище
+	if err := repo.Close(); err != nil {
+		logger.Log.Error("Ошибка при закрытии хранилища", zap.Error(err))
+	} else {
+		logger.Log.Info("Хранилище успешно закрыто")
+	}
+
+	logger.Log.Info("Приложение завершено")
 }
