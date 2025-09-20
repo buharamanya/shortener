@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/json"
 	"flag"
 	"os"
 	"reflect"
@@ -16,6 +17,7 @@ func reset() {
 	os.Unsetenv("DATABASE_DSN")
 	os.Unsetenv("SECRET_KEY")
 	os.Unsetenv("ENABLE_HTTPS")
+	os.Unsetenv("CONFIG")
 }
 
 func TestInitConfiguration_DefaultValues(t *testing.T) {
@@ -161,5 +163,136 @@ func TestInitConfiguration_EnableHTTPS_EnvironmentValues(t *testing.T) {
 				t.Errorf("Для значения '%s' ожидалось %v, получено %v", tc.envValue, tc.expected, config.EnableHTTPS)
 			}
 		})
+	}
+}
+
+func TestInitConfiguration_ConfigFile(t *testing.T) {
+	reset()
+
+	// Создаем временный конфигурационный файл
+	configData := AppConfig{
+		ServerBaseURL:   "file:8080",
+		RedirectBaseURL: "http://file:8080",
+		StorageFileName: "file.txt",
+		DataBaseDSN:     "file_DATABASE_DSN",
+		SecretKey:       "file_SECRET_KEY",
+		EnableHTTPS:     true,
+	}
+
+	tempFile, err := os.CreateTemp("", "config_test_*.json")
+	if err != nil {
+		t.Fatal("Cannot create temp file:", err)
+	}
+	defer os.Remove(tempFile.Name())
+
+	encoder := json.NewEncoder(tempFile)
+	encoder.SetIndent("", "  ")
+	if err := encoder.Encode(configData); err != nil {
+		t.Fatal("Cannot encode config to file:", err)
+	}
+	tempFile.Close()
+
+	// Устанавливаем переменную окружения CONFIG
+	os.Setenv("CONFIG", tempFile.Name())
+
+	// Пустые аргументы командной строки
+	oldArgs := os.Args
+	defer func() { os.Args = oldArgs }()
+	os.Args = []string{"cmd"}
+
+	config := InitConfiguration()
+
+	if !reflect.DeepEqual(config, &configData) {
+		t.Errorf("Ошибка загрузки конфигурации из файла. Ожидалось %v, получено %v", configData, config)
+	}
+}
+
+func TestInitConfiguration_ConfigFilePriority(t *testing.T) {
+	reset()
+
+	// Создаем временный конфигурационный файл
+	configData := AppConfig{
+		ServerBaseURL:   "file:8080",
+		RedirectBaseURL: "http://file:8080",
+		StorageFileName: "file.txt",
+		DataBaseDSN:     "file_DATABASE_DSN",
+		SecretKey:       "file_SECRET_KEY",
+		EnableHTTPS:     true,
+	}
+
+	tempFile, err := os.CreateTemp("", "config_test_*.json")
+	if err != nil {
+		t.Fatal("Cannot create temp file:", err)
+	}
+	defer os.Remove(tempFile.Name())
+
+	encoder := json.NewEncoder(tempFile)
+	encoder.SetIndent("", "  ")
+	if err := encoder.Encode(configData); err != nil {
+		t.Fatal("Cannot encode config to file:", err)
+	}
+	tempFile.Close()
+
+	// Устанавливаем переменные окружения (должны иметь приоритет над файлом)
+	os.Setenv("SERVER_ADDRESS", "env:8080")
+	os.Setenv("BASE_URL", "http://env:8080")
+	os.Setenv("CONFIG", tempFile.Name())
+
+	// Пустые аргументы командной строки
+	oldArgs := os.Args
+	defer func() { os.Args = oldArgs }()
+	os.Args = []string{"cmd"}
+
+	config := InitConfiguration()
+
+	expected := &AppConfig{
+		ServerBaseURL:   "env:8080",          // из env, а не из файла
+		RedirectBaseURL: "http://env:8080",   // из env, а не из файла
+		StorageFileName: "file.txt",          // из файла
+		DataBaseDSN:     "file_DATABASE_DSN", // из файла
+		SecretKey:       "file_SECRET_KEY",   // из файла
+		EnableHTTPS:     true,                // из файла
+	}
+
+	if !reflect.DeepEqual(config, expected) {
+		t.Errorf("Ошибка приоритета конфигурации. Ожидалось %v, получено %v", expected, config)
+	}
+}
+
+func TestInitConfiguration_ConfigFileFlag(t *testing.T) {
+	reset()
+
+	// Создаем временный конфигурационный файл
+	configData := AppConfig{
+		ServerBaseURL:   "file:8080",
+		RedirectBaseURL: "http://file:8080",
+		StorageFileName: "file.txt",
+		DataBaseDSN:     "file_DATABASE_DSN",
+		SecretKey:       "file_SECRET_KEY",
+		EnableHTTPS:     true,
+	}
+
+	tempFile, err := os.CreateTemp("", "config_test_*.json")
+	if err != nil {
+		t.Fatal("Cannot create temp file:", err)
+	}
+	defer os.Remove(tempFile.Name())
+
+	encoder := json.NewEncoder(tempFile)
+	encoder.SetIndent("", "  ")
+	if err := encoder.Encode(configData); err != nil {
+		t.Fatal("Cannot encode config to file:", err)
+	}
+	tempFile.Close()
+
+	// Используем флаг -c вместо переменной окружения
+	oldArgs := os.Args
+	defer func() { os.Args = oldArgs }()
+	os.Args = []string{"cmd", "-c=" + tempFile.Name()}
+
+	config := InitConfiguration()
+
+	if !reflect.DeepEqual(config, &configData) {
+		t.Errorf("Ошибка загрузки конфигурации из файла через флаг. Ожидалось %v, получено %v", configData, config)
 	}
 }

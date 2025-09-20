@@ -1,0 +1,8 @@
+{
+  "server_address": "localhost:8080",
+  "base_url": "http://localhost:8080",
+  "file_storage_path": "storage.txt",
+  "database_dsn": "postgres://yago:yago@localhost:6532/yago?sslmode=disable",
+  "secret_key": "secret_key",
+  "enable_https": false
+}
