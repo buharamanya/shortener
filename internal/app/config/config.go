@@ -17,6 +17,7 @@ const (
 	defaultSecretKey       = "secret"
 	defaultEnableHTTPS     = false
 	defaultConfigFile      = ""
+	defaultTrustedSubnet   = ""
 )
 
 // структура для конфига.
@@ -27,6 +28,7 @@ type AppConfig struct {
 	DataBaseDSN     string `json:"database_dsn"`
 	SecretKey       string `json:"secret_key"`
 	EnableHTTPS     bool   `json:"enable_https"`
+	TrustedSubnet   string `json:"trusted_subnet"`
 }
 
 // глобальный конфиг.
@@ -43,6 +45,7 @@ func InitConfiguration() *AppConfig {
 	flag.StringVar(&AppParams.SecretKey, "k", defaultSecretKey, "key for JWT")
 	flag.BoolVar(&AppParams.EnableHTTPS, "s", defaultEnableHTTPS, "enable HTTPS")
 	flag.StringVar(&configFile, "c", defaultConfigFile, "config file path")
+	flag.StringVar(&AppParams.TrustedSubnet, "t", defaultTrustedSubnet, "trusted subnet CIDR")
 
 	flag.Parse()
 
@@ -62,6 +65,7 @@ func InitConfiguration() *AppConfig {
 	envDataBaseDSN := os.Getenv("DATABASE_DSN")
 	envSecretKey := os.Getenv("SECRET_KEY")
 	envEnableHTTPS := os.Getenv("ENABLE_HTTPS")
+	envTrustedSubnet := os.Getenv("TRUSTED_SUBNET")
 
 	if envServerBaseURL != "" {
 		AppParams.ServerBaseURL = envServerBaseURL
@@ -85,6 +89,10 @@ func InitConfiguration() *AppConfig {
 
 	if envEnableHTTPS == "true" || envEnableHTTPS == "1" {
 		AppParams.EnableHTTPS = true
+	}
+
+	if envTrustedSubnet != "" {
+		AppParams.TrustedSubnet = envTrustedSubnet
 	}
 
 	return &AppParams
@@ -126,5 +134,8 @@ func loadConfigFromFile(filename string) {
 	// (в Go булево значение по умолчанию false, поэтому используем отдельный флаг)
 	if fileConfig.EnableHTTPS {
 		AppParams.EnableHTTPS = fileConfig.EnableHTTPS
+	}
+	if fileConfig.TrustedSubnet != "" {
+		AppParams.TrustedSubnet = fileConfig.TrustedSubnet
 	}
 }
