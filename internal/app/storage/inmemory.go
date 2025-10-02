@@ -105,3 +105,8 @@ func (s *InMemoryStorage) DeleteURLs(shortCodes []string, userID string) error {
 
 	return nil
 }
+
+// Close - закрывает файловый дескриптор.
+func (s *InMemoryStorage) Close() error {
+	return s.file.Close()
+}

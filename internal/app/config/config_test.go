@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/json"
 	"flag"
 	"os"
 	"reflect"
@@ -15,6 +16,8 @@ func reset() {
 	os.Unsetenv("FILE_STORAGE_PATH")
 	os.Unsetenv("DATABASE_DSN")
 	os.Unsetenv("SECRET_KEY")
+	os.Unsetenv("ENABLE_HTTPS")
+	os.Unsetenv("CONFIG")
 }
 
 func TestInitConfiguration_DefaultValues(t *testing.T) {
@@ -33,6 +36,7 @@ func TestInitConfiguration_DefaultValues(t *testing.T) {
 		StorageFileName: defaultStorageFileName,
 		DataBaseDSN:     defaultDataBaseDSN,
 		SecretKey:       defaultSecretKey,
+		EnableHTTPS:     defaultEnableHTTPS,
 	}
 
 	if !reflect.DeepEqual(config, expected) {
@@ -46,7 +50,7 @@ func TestInitConfiguration_CommandLineFlags(t *testing.T) {
 	// Сохраняем оригинальные аргументы и восстанавливаем их после теста
 	oldArgs := os.Args
 	defer func() { os.Args = oldArgs }()
-	os.Args = []string{"cmd", "-a=flag:8080", "-b=http://flag:8080", "-f=flag.txt", "-d=flag_DATABASE_DSN", "-s=flag_key"}
+	os.Args = []string{"cmd", "-a=flag:8080", "-b=http://flag:8080", "-f=flag.txt", "-d=flag_DATABASE_DSN", "-k=flag_key", "-s=true"}
 
 	config := InitConfiguration()
 
@@ -56,6 +60,7 @@ func TestInitConfiguration_CommandLineFlags(t *testing.T) {
 		StorageFileName: "flag.txt",
 		DataBaseDSN:     "flag_DATABASE_DSN",
 		SecretKey:       "flag_key",
+		EnableHTTPS:     true,
 	}
 
 	if !reflect.DeepEqual(config, expected) {
@@ -72,6 +77,7 @@ func TestInitConfiguration_EnvironmentVariables(t *testing.T) {
 	os.Setenv("FILE_STORAGE_PATH", "env.txt")
 	os.Setenv("DATABASE_DSN", "env_DATABASE_DSN")
 	os.Setenv("SECRET_KEY", "env_SECRET_KEY")
+	os.Setenv("ENABLE_HTTPS", "true")
 
 	// Пустые аргументы командной строки
 	oldArgs := os.Args
@@ -86,6 +92,7 @@ func TestInitConfiguration_EnvironmentVariables(t *testing.T) {
 		StorageFileName: "env.txt",
 		DataBaseDSN:     "env_DATABASE_DSN",
 		SecretKey:       "env_SECRET_KEY",
+		EnableHTTPS:     true,
 	}
 
 	if !reflect.DeepEqual(config, expected) {
@@ -102,11 +109,12 @@ func TestInitConfiguration_Priority(t *testing.T) {
 	os.Setenv("FILE_STORAGE_PATH", "env.txt")
 	os.Setenv("DATABASE_DSN", "env_DATABASE_DSN")
 	os.Setenv("SECRET_KEY", "env_SECRET_KEY")
+	os.Setenv("ENABLE_HTTPS", "true")
 
 	// Сохраняем оригинальные аргументы и восстанавливаем их после теста
 	oldArgs := os.Args
 	defer func() { os.Args = oldArgs }()
-	os.Args = []string{"cmd", "-a=flag:8080", "-b=http://flag:8080", "-f=flag.txt", "-d=flag_DATABASE_DSN", "-s=flag_key"}
+	os.Args = []string{"cmd", "-a=flag:8080", "-b=http://flag:8080", "-f=flag.txt", "-d=flag_DATABASE_DSN", "-k=flag_key", "-s=false"}
 
 	config := InitConfiguration()
 
@@ -117,9 +125,174 @@ func TestInitConfiguration_Priority(t *testing.T) {
 		StorageFileName: "env.txt",
 		DataBaseDSN:     "env_DATABASE_DSN",
 		SecretKey:       "env_SECRET_KEY",
+		EnableHTTPS:     true, // Переменная окружения имеет приоритет
 	}
 
 	if !reflect.DeepEqual(config, expected) {
 		t.Errorf("Ошибка приоритета выбора переменных. Ожидалось %v, получено %v", expected, config)
+	}
+}
+
+func TestInitConfiguration_EnableHTTPS_EnvironmentValues(t *testing.T) {
+	reset()
+
+	testCases := []struct {
+		name     string
+		envValue string
+		expected bool
+	}{
+		{"true value", "true", true},
+		{"1 value", "1", true},
+		{"false value", "false", false},
+		{"empty value", "", false},
+		{"other value", "yes", false},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			reset()
+			os.Setenv("ENABLE_HTTPS", tc.envValue)
+
+			oldArgs := os.Args
+			defer func() { os.Args = oldArgs }()
+			os.Args = []string{"cmd"}
+
+			config := InitConfiguration()
+
+			if config.EnableHTTPS != tc.expected {
+				t.Errorf("Для значения '%s' ожидалось %v, получено %v", tc.envValue, tc.expected, config.EnableHTTPS)
+			}
+		})
+	}
+}
+
+func TestInitConfiguration_ConfigFile(t *testing.T) {
+	reset()
+
+	// Создаем временный конфигурационный файл
+	configData := AppConfig{
+		ServerBaseURL:   "file:8080",
+		RedirectBaseURL: "http://file:8080",
+		StorageFileName: "file.txt",
+		DataBaseDSN:     "file_DATABASE_DSN",
+		SecretKey:       "file_SECRET_KEY",
+		EnableHTTPS:     true,
+	}
+
+	tempFile, err := os.CreateTemp("", "config_test_*.json")
+	if err != nil {
+		t.Fatal("Cannot create temp file:", err)
+	}
+	defer os.Remove(tempFile.Name())
+
+	encoder := json.NewEncoder(tempFile)
+	encoder.SetIndent("", "  ")
+	if err := encoder.Encode(configData); err != nil {
+		t.Fatal("Cannot encode config to file:", err)
+	}
+	tempFile.Close()
+
+	// Устанавливаем переменную окружения CONFIG
+	os.Setenv("CONFIG", tempFile.Name())
+
+	// Пустые аргументы командной строки
+	oldArgs := os.Args
+	defer func() { os.Args = oldArgs }()
+	os.Args = []string{"cmd"}
+
+	config := InitConfiguration()
+
+	if !reflect.DeepEqual(config, &configData) {
+		t.Errorf("Ошибка загрузки конфигурации из файла. Ожидалось %v, получено %v", configData, config)
+	}
+}
+
+func TestInitConfiguration_ConfigFilePriority(t *testing.T) {
+	reset()
+
+	// Создаем временный конфигурационный файл
+	configData := AppConfig{
+		ServerBaseURL:   "file:8080",
+		RedirectBaseURL: "http://file:8080",
+		StorageFileName: "file.txt",
+		DataBaseDSN:     "file_DATABASE_DSN",
+		SecretKey:       "file_SECRET_KEY",
+		EnableHTTPS:     true,
+	}
+
+	tempFile, err := os.CreateTemp("", "config_test_*.json")
+	if err != nil {
+		t.Fatal("Cannot create temp file:", err)
+	}
+	defer os.Remove(tempFile.Name())
+
+	encoder := json.NewEncoder(tempFile)
+	encoder.SetIndent("", "  ")
+	if err := encoder.Encode(configData); err != nil {
+		t.Fatal("Cannot encode config to file:", err)
+	}
+	tempFile.Close()
+
+	// Устанавливаем переменные окружения (должны иметь приоритет над файлом)
+	os.Setenv("SERVER_ADDRESS", "env:8080")
+	os.Setenv("BASE_URL", "http://env:8080")
+	os.Setenv("CONFIG", tempFile.Name())
+
+	// Пустые аргументы командной строки
+	oldArgs := os.Args
+	defer func() { os.Args = oldArgs }()
+	os.Args = []string{"cmd"}
+
+	config := InitConfiguration()
+
+	expected := &AppConfig{
+		ServerBaseURL:   "env:8080",          // из env, а не из файла
+		RedirectBaseURL: "http://env:8080",   // из env, а не из файла
+		StorageFileName: "file.txt",          // из файла
+		DataBaseDSN:     "file_DATABASE_DSN", // из файла
+		SecretKey:       "file_SECRET_KEY",   // из файла
+		EnableHTTPS:     true,                // из файла
+	}
+
+	if !reflect.DeepEqual(config, expected) {
+		t.Errorf("Ошибка приоритета конфигурации. Ожидалось %v, получено %v", expected, config)
+	}
+}
+
+func TestInitConfiguration_ConfigFileFlag(t *testing.T) {
+	reset()
+
+	// Создаем временный конфигурационный файл
+	configData := AppConfig{
+		ServerBaseURL:   "file:8080",
+		RedirectBaseURL: "http://file:8080",
+		StorageFileName: "file.txt",
+		DataBaseDSN:     "file_DATABASE_DSN",
+		SecretKey:       "file_SECRET_KEY",
+		EnableHTTPS:     true,
+	}
+
+	tempFile, err := os.CreateTemp("", "config_test_*.json")
+	if err != nil {
+		t.Fatal("Cannot create temp file:", err)
+	}
+	defer os.Remove(tempFile.Name())
+
+	encoder := json.NewEncoder(tempFile)
+	encoder.SetIndent("", "  ")
+	if err := encoder.Encode(configData); err != nil {
+		t.Fatal("Cannot encode config to file:", err)
+	}
+	tempFile.Close()
+
+	// Используем флаг -c вместо переменной окружения
+	oldArgs := os.Args
+	defer func() { os.Args = oldArgs }()
+	os.Args = []string{"cmd", "-c=" + tempFile.Name()}
+
+	config := InitConfiguration()
+
+	if !reflect.DeepEqual(config, &configData) {
+		t.Errorf("Ошибка загрузки конфигурации из файла через флаг. Ожидалось %v, получено %v", configData, config)
 	}
 }

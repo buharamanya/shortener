@@ -17,10 +17,15 @@ type DBStorage struct {
 }
 
 // NewDBStorage.
-func NewDBStorage(dbDSN string) *DBStorage {
+func NewDBStorage(dbDSN string) (*DBStorage, error) {
 	db, err := sql.Open("pgx", dbDSN)
 	if err != nil {
-		logger.Log.Fatal("Ошибка инициализации базы данных", zap.Error(err))
+		return nil, fmt.Errorf("ошибка инициализации базы данных: %w", err)
+	}
+
+	// Проверяем соединение с базой данных
+	if err := db.Ping(); err != nil {
+		return nil, fmt.Errorf("ошибка подключения к базе данных: %w", err)
 	}
 
 	createTableQuery := `
@@ -33,12 +38,12 @@ func NewDBStorage(dbDSN string) *DBStorage {
 	)`
 
 	if _, err = db.Exec(createTableQuery); err != nil {
-		logger.Log.Fatal("Ошибка инициализации базы данных", zap.Error(err))
+		return nil, fmt.Errorf("ошибка создания таблицы: %w", err)
 	}
 
 	return &DBStorage{
 		DB: db,
-	}
+	}, nil
 }
 
 // сохранить.
@@ -128,6 +133,11 @@ func (db *DBStorage) DeleteURLs(shortCodes []string, userID string) error {
 	}
 	_, err := db.Exec(query, args...)
 	return err
+}
+
+// Close - закрывает соединение с базой данных.
+func (db *DBStorage) Close() error {
+	return db.DB.Close()
 }
 
 func placeholders(n int) string {

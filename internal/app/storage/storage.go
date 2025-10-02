@@ -26,4 +26,5 @@ type URLStorage interface {
 	SaveBatch(records []ShortURLRecord) error
 	GetURLsByUserID(userID string) ([]ShortURLRecord, error)
 	DeleteURLs(shortCodes []string, userID string) error
+	Close() error
 }
