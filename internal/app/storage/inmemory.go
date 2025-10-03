@@ -110,3 +110,19 @@ func (s *InMemoryStorage) DeleteURLs(shortCodes []string, userID string) error {
 func (s *InMemoryStorage) Close() error {
 	return s.file.Close()
 }
+
+// GetStats - получает статистику для in-memory хранилища
+func (s *InMemoryStorage) GetStats() (urlsCount int, usersCount int, err error) {
+	urlsCount = len(s.urls)
+
+	// Считаем уникальных пользователей
+	users := make(map[string]bool)
+	for _, record := range s.urls {
+		if record.UserID != "" {
+			users[record.UserID] = true
+		}
+	}
+	usersCount = len(users)
+
+	return urlsCount, usersCount, nil
+}

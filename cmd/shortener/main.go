@@ -64,6 +64,9 @@ func main() {
 		r.Mount("/debug/pprof", http.DefaultServeMux)
 	})
 
+	// Новый эндпоинт для статистики
+	r.Get("/api/internal/stats", handlers.APIStatsHandler(repo))
+
 	r.Group(func(r chi.Router) {
 		r.Use(handlers.WithGzipMiddleware, auth.WithAuthMiddleware())
 		r.Post("/", shortenHandler.ShortenURL)
@@ -156,7 +159,7 @@ func main() {
 		logger.Log.Info("Сервер успешно остановлен")
 	}
 
-	// Закрываем хранилище
+	// Закрываем хранилища
 	if err := repo.Close(); err != nil {
 		logger.Log.Error("Ошибка при закрытии хранилища", zap.Error(err))
 	} else {
