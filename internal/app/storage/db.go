@@ -147,3 +147,20 @@ func placeholders(n int) string {
 	}
 	return strings.Join(ph, ",")
 }
+
+// GetStats - получает статистику для БД хранилища
+func (db *DBStorage) GetStats() (urlsCount int, usersCount int, err error) {
+	// Получаем количество URL
+	err = db.QueryRow("SELECT COUNT(*) FROM shorturl").Scan(&urlsCount)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	// Получаем количество уникальных пользователей
+	err = db.QueryRow("SELECT COUNT(DISTINCT user_id) FROM shorturl WHERE user_id != ''").Scan(&usersCount)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	return urlsCount, usersCount, nil
+}

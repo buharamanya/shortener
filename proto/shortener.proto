@@ -1,0 +1,88 @@
+syntax = "proto3";
+
+package shortener;
+option go_package = "github.com/buharamanya/shortener/internal/app/proto";
+
+import "google/protobuf/empty.proto";
+
+service Shortener {
+  rpc ShortenURL(ShortenURLRequest) returns (ShortenURLResponse) {}
+  rpc ShortenURLJSON(ShortenURLJSONRequest) returns (ShortenURLJSONResponse) {}
+  rpc ShortenURLBatch(ShortenURLBatchRequest) returns (ShortenURLBatchResponse) {}
+  rpc RedirectByShortURL(RedirectRequest) returns (RedirectResponse) {}
+  rpc GetUserURLs(google.protobuf.Empty) returns (UserURLsResponse) {}
+  rpc DeleteUserURLs(DeleteUserURLsRequest) returns (google.protobuf.Empty) {}
+  rpc Ping(google.protobuf.Empty) returns (PingResponse) {}
+  rpc GetStats(google.protobuf.Empty) returns (StatsResponse) {}
+}
+
+message ShortenURLRequest {
+  string url = 1;
+}
+
+message ShortenURLResponse {
+  string result = 1;
+  int32 status = 2;
+}
+
+message ShortenURLJSONRequest {
+  string url = 1;
+}
+
+message ShortenURLJSONResponse {
+  string result = 1;
+  int32 status = 2;
+}
+
+message ShortenURLBatchRequest {
+  repeated BatchRequest items = 1;
+}
+
+message BatchRequest {
+  string correlation_id = 1;
+  string original_url = 2;
+}
+
+message ShortenURLBatchResponse {
+  repeated BatchResponse items = 1;
+  int32 status = 2;
+}
+
+message BatchResponse {
+  string correlation_id = 1;
+  string short_url = 2;
+}
+
+message RedirectRequest {
+  string short_code = 1;
+}
+
+message RedirectResponse {
+  string location = 1;
+  int32 status = 2;
+}
+
+message UserURLsResponse {
+  repeated UserURL items = 1;
+  int32 status = 2;
+}
+
+message UserURL {
+  string short_url = 1;
+  string original_url = 2;
+}
+
+message DeleteUserURLsRequest {
+  repeated string short_codes = 1;
+}
+
+message PingResponse {
+  bool success = 1;
+  int32 status = 2;
+}
+
+message StatsResponse {
+  int32 urls = 1;
+  int32 users = 2;
+  int32 status = 3;
+}

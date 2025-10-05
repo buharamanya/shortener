@@ -27,4 +27,5 @@ type URLStorage interface {
 	GetURLsByUserID(userID string) ([]ShortURLRecord, error)
 	DeleteURLs(shortCodes []string, userID string) error
 	Close() error
+	GetStats() (urlsCount int, usersCount int, err error)
 }

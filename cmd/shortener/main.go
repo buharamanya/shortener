@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"net"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
@@ -13,11 +14,15 @@ import (
 
 	"github.com/buharamanya/shortener/internal/app/auth"
 	"github.com/buharamanya/shortener/internal/app/config"
+	"github.com/buharamanya/shortener/internal/app/core"
+	grpcserver "github.com/buharamanya/shortener/internal/app/grpc"
 	"github.com/buharamanya/shortener/internal/app/handlers"
 	"github.com/buharamanya/shortener/internal/app/logger"
+	"github.com/buharamanya/shortener/internal/app/proto"
 	"github.com/buharamanya/shortener/internal/app/storage"
 	"github.com/go-chi/chi/v5"
 	"go.uber.org/zap"
+	"google.golang.org/grpc"
 )
 
 var (
@@ -52,6 +57,10 @@ func main() {
 	}
 	defer repo.Close()
 
+	// Создаем общий сервис бизнес-логики
+	coreService := core.NewShortenerService(repo, appConfig.RedirectBaseURL)
+
+	// Создаем HTTP хендлеры
 	shortenHandler := handlers.NewShortenHandler(repo, appConfig.RedirectBaseURL)
 
 	r := chi.NewRouter()
@@ -63,6 +72,9 @@ func main() {
 	r.Group(func(r chi.Router) {
 		r.Mount("/debug/pprof", http.DefaultServeMux)
 	})
+
+	// Новый эндпоинт для статистики
+	r.Get("/api/internal/stats", handlers.APIStatsHandler(repo))
 
 	r.Group(func(r chi.Router) {
 		r.Use(handlers.WithGzipMiddleware, auth.WithAuthMiddleware())
@@ -86,7 +98,28 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Запускаем сервер в отдельной горутине
+	// Запускаем gRPC сервер в отдельной горутине
+	var grpcServer *grpc.Server
+	grpcStopped := make(chan struct{})
+
+	go func() {
+		grpcAddr := ":" + appConfig.GRPCPort
+		listener, err := net.Listen("tcp", grpcAddr)
+		if err != nil {
+			logger.Log.Fatal("Failed to listen for gRPC", zap.Error(err))
+		}
+
+		grpcServer = grpc.NewServer()
+		proto.RegisterShortenerServer(grpcServer, grpcserver.NewServer(coreService))
+
+		logger.Log.Info("Starting gRPC server", zap.String("address", grpcAddr))
+		if err := grpcServer.Serve(listener); err != nil && err != grpc.ErrServerStopped {
+			logger.Log.Fatal("Failed to serve gRPC", zap.Error(err))
+		}
+		close(grpcStopped)
+	}()
+
+	// Запускаем HTTP сервер в отдельной горутине
 	server := &http.Server{
 		Addr:    appConfig.ServerBaseURL,
 		Handler: r,
@@ -139,7 +172,9 @@ func main() {
 	case sig := <-signalChan:
 		logger.Log.Info("Получен сигнал завершения", zap.String("signal", sig.String()))
 	case <-serverStopped:
-		logger.Log.Info("Сервер остановился самостоятельно")
+		logger.Log.Info("HTTP сервер остановился самостоятельно")
+	case <-grpcStopped:
+		logger.Log.Info("gRPC сервер остановился самостоятельно")
 	}
 
 	// Инициируем graceful shutdown
@@ -149,14 +184,21 @@ func main() {
 	shutdownCtx, shutdownCancel := context.WithTimeout(ctx, 30*time.Second)
 	defer shutdownCancel()
 
-	// Останавливаем сервер
+	// Останавливаем HTTP сервер
 	if err := server.Shutdown(shutdownCtx); err != nil {
-		logger.Log.Error("Ошибка при graceful shutdown", zap.Error(err))
+		logger.Log.Error("Ошибка при graceful shutdown HTTP сервера", zap.Error(err))
 	} else {
-		logger.Log.Info("Сервер успешно остановлен")
+		logger.Log.Info("HTTP сервер успешно остановлен")
 	}
 
-	// Закрываем хранилище
+	// Останавливаем gRPC сервер
+	if grpcServer != nil {
+		logger.Log.Info("Останавливаем gRPC сервер...")
+		grpcServer.GracefulStop()
+		logger.Log.Info("gRPC сервер успешно остановлен")
+	}
+
+	// Закрываем хранилища
 	if err := repo.Close(); err != nil {
 		logger.Log.Error("Ошибка при закрытии хранилища", zap.Error(err))
 	} else {

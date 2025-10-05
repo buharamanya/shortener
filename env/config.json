@@ -4,5 +4,6 @@
   "file_storage_path": "storage.txt",
   "database_dsn": "postgres://yago:yago@localhost:6532/yago?sslmode=disable",
   "secret_key": "secret_key",
-  "enable_https": false
+  "enable_https": false,
+  "trusted_subnet": "127.0.0.1/32"
 }

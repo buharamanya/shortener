@@ -17,6 +17,8 @@ const (
 	defaultSecretKey       = "secret"
 	defaultEnableHTTPS     = false
 	defaultConfigFile      = ""
+	defaultTrustedSubnet   = ""
+	defaultGRPCPort        = "50051"
 )
 
 // структура для конфига.
@@ -27,6 +29,8 @@ type AppConfig struct {
 	DataBaseDSN     string `json:"database_dsn"`
 	SecretKey       string `json:"secret_key"`
 	EnableHTTPS     bool   `json:"enable_https"`
+	TrustedSubnet   string `json:"trusted_subnet"`
+	GRPCPort        string `json:"grpc_port"`
 }
 
 // глобальный конфиг.
@@ -43,6 +47,8 @@ func InitConfiguration() *AppConfig {
 	flag.StringVar(&AppParams.SecretKey, "k", defaultSecretKey, "key for JWT")
 	flag.BoolVar(&AppParams.EnableHTTPS, "s", defaultEnableHTTPS, "enable HTTPS")
 	flag.StringVar(&configFile, "c", defaultConfigFile, "config file path")
+	flag.StringVar(&AppParams.TrustedSubnet, "t", defaultTrustedSubnet, "trusted subnet CIDR")
+	flag.StringVar(&AppParams.GRPCPort, "grpc-port", defaultGRPCPort, "gRPC server port")
 
 	flag.Parse()
 
@@ -62,6 +68,8 @@ func InitConfiguration() *AppConfig {
 	envDataBaseDSN := os.Getenv("DATABASE_DSN")
 	envSecretKey := os.Getenv("SECRET_KEY")
 	envEnableHTTPS := os.Getenv("ENABLE_HTTPS")
+	envTrustedSubnet := os.Getenv("TRUSTED_SUBNET")
+	envGRPCPort := os.Getenv("GRPC_PORT")
 
 	if envServerBaseURL != "" {
 		AppParams.ServerBaseURL = envServerBaseURL
@@ -85,6 +93,14 @@ func InitConfiguration() *AppConfig {
 
 	if envEnableHTTPS == "true" || envEnableHTTPS == "1" {
 		AppParams.EnableHTTPS = true
+	}
+
+	if envTrustedSubnet != "" {
+		AppParams.TrustedSubnet = envTrustedSubnet
+	}
+
+	if envGRPCPort != "" {
+		AppParams.GRPCPort = envGRPCPort
 	}
 
 	return &AppParams
@@ -126,5 +142,11 @@ func loadConfigFromFile(filename string) {
 	// (в Go булево значение по умолчанию false, поэтому используем отдельный флаг)
 	if fileConfig.EnableHTTPS {
 		AppParams.EnableHTTPS = fileConfig.EnableHTTPS
+	}
+	if fileConfig.TrustedSubnet != "" {
+		AppParams.TrustedSubnet = fileConfig.TrustedSubnet
+	}
+	if fileConfig.GRPCPort != "" {
+		AppParams.GRPCPort = fileConfig.GRPCPort
 	}
 }
