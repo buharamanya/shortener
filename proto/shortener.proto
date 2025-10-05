@@ -1,7 +1,7 @@
 syntax = "proto3";
 
 package shortener;
-option go_package = "./internal/app/proto";
+option go_package = "github.com/buharamanya/shortener/internal/app/proto";
 
 import "google/protobuf/empty.proto";
 

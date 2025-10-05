@@ -9,19 +9,29 @@ import (
 )
 
 // Вспомогательная функция для сброса состояния флагов и переменных окружения
-func reset() {
-	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ContinueOnError) // Сбрасываем флаги
-	os.Unsetenv("SERVER_ADDRESS")                                        // Очищаем переменные окружения
+func reset(t *testing.T) {
+	t.Helper()
+
+	// Сбрасываем флаги путем создания нового FlagSet
+	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
+
+	// Очищаем глобальную переменную конфигурации
+	AppParams = AppConfig{}
+
+	// Очищаем переменные окружения
+	os.Unsetenv("SERVER_ADDRESS")
 	os.Unsetenv("BASE_URL")
 	os.Unsetenv("FILE_STORAGE_PATH")
 	os.Unsetenv("DATABASE_DSN")
 	os.Unsetenv("SECRET_KEY")
 	os.Unsetenv("ENABLE_HTTPS")
+	os.Unsetenv("TRUSTED_SUBNET")
+	os.Unsetenv("GRPC_PORT")
 	os.Unsetenv("CONFIG")
 }
 
 func TestInitConfiguration_DefaultValues(t *testing.T) {
-	reset()
+	reset(t)
 
 	// Сохраняем оригинальные аргументы и восстанавливаем их после теста
 	oldArgs := os.Args
@@ -37,6 +47,8 @@ func TestInitConfiguration_DefaultValues(t *testing.T) {
 		DataBaseDSN:     defaultDataBaseDSN,
 		SecretKey:       defaultSecretKey,
 		EnableHTTPS:     defaultEnableHTTPS,
+		TrustedSubnet:   defaultTrustedSubnet,
+		GRPCPort:        defaultGRPCPort,
 	}
 
 	if !reflect.DeepEqual(config, expected) {
@@ -45,12 +57,12 @@ func TestInitConfiguration_DefaultValues(t *testing.T) {
 }
 
 func TestInitConfiguration_CommandLineFlags(t *testing.T) {
-	reset()
+	reset(t)
 
 	// Сохраняем оригинальные аргументы и восстанавливаем их после теста
 	oldArgs := os.Args
 	defer func() { os.Args = oldArgs }()
-	os.Args = []string{"cmd", "-a=flag:8080", "-b=http://flag:8080", "-f=flag.txt", "-d=flag_DATABASE_DSN", "-k=flag_key", "-s=true"}
+	os.Args = []string{"cmd", "-a=flag:8080", "-b=http://flag:8080", "-f=flag.txt", "-d=flag_DATABASE_DSN", "-k=flag_key", "-s=true", "-t=192.168.1.0/24", "-grpc-port=9090"}
 
 	config := InitConfiguration()
 
@@ -61,6 +73,8 @@ func TestInitConfiguration_CommandLineFlags(t *testing.T) {
 		DataBaseDSN:     "flag_DATABASE_DSN",
 		SecretKey:       "flag_key",
 		EnableHTTPS:     true,
+		TrustedSubnet:   "192.168.1.0/24",
+		GRPCPort:        "9090",
 	}
 
 	if !reflect.DeepEqual(config, expected) {
@@ -69,7 +83,7 @@ func TestInitConfiguration_CommandLineFlags(t *testing.T) {
 }
 
 func TestInitConfiguration_EnvironmentVariables(t *testing.T) {
-	reset()
+	reset(t)
 
 	// Устанавливаем переменные окружения
 	os.Setenv("SERVER_ADDRESS", "env:8080")
@@ -78,6 +92,8 @@ func TestInitConfiguration_EnvironmentVariables(t *testing.T) {
 	os.Setenv("DATABASE_DSN", "env_DATABASE_DSN")
 	os.Setenv("SECRET_KEY", "env_SECRET_KEY")
 	os.Setenv("ENABLE_HTTPS", "true")
+	os.Setenv("TRUSTED_SUBNET", "10.0.0.0/24")
+	os.Setenv("GRPC_PORT", "50052")
 
 	// Пустые аргументы командной строки
 	oldArgs := os.Args
@@ -93,6 +109,8 @@ func TestInitConfiguration_EnvironmentVariables(t *testing.T) {
 		DataBaseDSN:     "env_DATABASE_DSN",
 		SecretKey:       "env_SECRET_KEY",
 		EnableHTTPS:     true,
+		TrustedSubnet:   "10.0.0.0/24",
+		GRPCPort:        "50052",
 	}
 
 	if !reflect.DeepEqual(config, expected) {
@@ -101,7 +119,7 @@ func TestInitConfiguration_EnvironmentVariables(t *testing.T) {
 }
 
 func TestInitConfiguration_Priority(t *testing.T) {
-	reset()
+	reset(t)
 
 	// Устанавливаем и флаги, и переменные окружения
 	os.Setenv("SERVER_ADDRESS", "env:8080")
@@ -110,11 +128,13 @@ func TestInitConfiguration_Priority(t *testing.T) {
 	os.Setenv("DATABASE_DSN", "env_DATABASE_DSN")
 	os.Setenv("SECRET_KEY", "env_SECRET_KEY")
 	os.Setenv("ENABLE_HTTPS", "true")
+	os.Setenv("TRUSTED_SUBNET", "10.0.0.0/24")
+	os.Setenv("GRPC_PORT", "50052")
 
 	// Сохраняем оригинальные аргументы и восстанавливаем их после теста
 	oldArgs := os.Args
 	defer func() { os.Args = oldArgs }()
-	os.Args = []string{"cmd", "-a=flag:8080", "-b=http://flag:8080", "-f=flag.txt", "-d=flag_DATABASE_DSN", "-k=flag_key", "-s=false"}
+	os.Args = []string{"cmd", "-a=flag:8080", "-b=http://flag:8080", "-f=flag.txt", "-d=flag_DATABASE_DSN", "-k=flag_key", "-s=false", "-t=192.168.1.0/24", "-grpc-port=9090"}
 
 	config := InitConfiguration()
 
@@ -126,6 +146,8 @@ func TestInitConfiguration_Priority(t *testing.T) {
 		DataBaseDSN:     "env_DATABASE_DSN",
 		SecretKey:       "env_SECRET_KEY",
 		EnableHTTPS:     true, // Переменная окружения имеет приоритет
+		TrustedSubnet:   "10.0.0.0/24",
+		GRPCPort:        "50052",
 	}
 
 	if !reflect.DeepEqual(config, expected) {
@@ -134,7 +156,7 @@ func TestInitConfiguration_Priority(t *testing.T) {
 }
 
 func TestInitConfiguration_EnableHTTPS_EnvironmentValues(t *testing.T) {
-	reset()
+	reset(t)
 
 	testCases := []struct {
 		name     string
@@ -150,7 +172,7 @@ func TestInitConfiguration_EnableHTTPS_EnvironmentValues(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			reset()
+			reset(t)
 			os.Setenv("ENABLE_HTTPS", tc.envValue)
 
 			oldArgs := os.Args
@@ -167,7 +189,7 @@ func TestInitConfiguration_EnableHTTPS_EnvironmentValues(t *testing.T) {
 }
 
 func TestInitConfiguration_ConfigFile(t *testing.T) {
-	reset()
+	reset(t)
 
 	// Создаем временный конфигурационный файл
 	configData := AppConfig{
@@ -177,6 +199,8 @@ func TestInitConfiguration_ConfigFile(t *testing.T) {
 		DataBaseDSN:     "file_DATABASE_DSN",
 		SecretKey:       "file_SECRET_KEY",
 		EnableHTTPS:     true,
+		TrustedSubnet:   "172.16.0.0/24",
+		GRPCPort:        "50053",
 	}
 
 	tempFile, err := os.CreateTemp("", "config_test_*.json")
@@ -208,7 +232,7 @@ func TestInitConfiguration_ConfigFile(t *testing.T) {
 }
 
 func TestInitConfiguration_ConfigFilePriority(t *testing.T) {
-	reset()
+	reset(t)
 
 	// Создаем временный конфигурационный файл
 	configData := AppConfig{
@@ -218,6 +242,8 @@ func TestInitConfiguration_ConfigFilePriority(t *testing.T) {
 		DataBaseDSN:     "file_DATABASE_DSN",
 		SecretKey:       "file_SECRET_KEY",
 		EnableHTTPS:     true,
+		TrustedSubnet:   "172.16.0.0/24",
+		GRPCPort:        "50053",
 	}
 
 	tempFile, err := os.CreateTemp("", "config_test_*.json")
@@ -252,6 +278,8 @@ func TestInitConfiguration_ConfigFilePriority(t *testing.T) {
 		DataBaseDSN:     "file_DATABASE_DSN", // из файла
 		SecretKey:       "file_SECRET_KEY",   // из файла
 		EnableHTTPS:     true,                // из файла
+		TrustedSubnet:   "172.16.0.0/24",     // из файла
+		GRPCPort:        "50053",             // из файла
 	}
 
 	if !reflect.DeepEqual(config, expected) {
@@ -260,7 +288,7 @@ func TestInitConfiguration_ConfigFilePriority(t *testing.T) {
 }
 
 func TestInitConfiguration_ConfigFileFlag(t *testing.T) {
-	reset()
+	reset(t)
 
 	// Создаем временный конфигурационный файл
 	configData := AppConfig{
@@ -270,6 +298,8 @@ func TestInitConfiguration_ConfigFileFlag(t *testing.T) {
 		DataBaseDSN:     "file_DATABASE_DSN",
 		SecretKey:       "file_SECRET_KEY",
 		EnableHTTPS:     true,
+		TrustedSubnet:   "172.16.0.0/24",
+		GRPCPort:        "50053",
 	}
 
 	tempFile, err := os.CreateTemp("", "config_test_*.json")
